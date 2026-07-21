@@ -1,0 +1,70 @@
+# Agent de nœud lossnear : accès fichiers direct au stockage local-path.
+# DaemonSet (un pod par nœud) car les volumes local-path sont épinglés au nœud.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: lossnear-agent
+  namespace: lossnear-system
+  labels:
+    app.kubernetes.io/name: lossnear-agent
+    app.kubernetes.io/part-of: lossnear
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: lossnear-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lossnear-agent
+    spec:
+      containers:
+        - name: agent
+          image: ghcr.io/tanyalaleuve/lossnear-agent:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: STORAGE_ROOT
+              value: /data-root
+            - name: AGENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: lossnear-agent-token
+                  key: AGENT_TOKEN
+          volumeMounts:
+            - name: storage
+              mountPath: /data-root
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: storage
+          hostPath:
+            # Racine de stockage du local-path-provisioner (données des serveurs).
+            path: /opt/local-path-provisioner
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lossnear-agent
+  namespace: lossnear-system
+  labels:
+    app.kubernetes.io/name: lossnear-agent
+spec:
+  selector:
+    app.kubernetes.io/name: lossnear-agent
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

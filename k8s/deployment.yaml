@@ -36,6 +36,8 @@ spec:
                 name: k8s-dashboard-env
             - secretRef:
                 name: k8s-dashboard-db
+            - secretRef:
+                name: lossnear-agent-token
           resources:
             requests:
               cpu: 100m

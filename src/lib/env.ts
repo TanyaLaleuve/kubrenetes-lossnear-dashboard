@@ -9,6 +9,12 @@ const schema = z.object({
   // users est vide au démarrage).
   ADMIN_USER: z.string().min(1),
   ADMIN_PASSWORD_HASH: z.string().startsWith("$2", "hash bcrypt attendu"),
+  // Agent de nœud (gestion de fichiers). Optionnels : le gestionnaire de
+  // fichiers est simplement indisponible s'ils manquent.
+  AGENT_URL: z
+    .string()
+    .default("http://lossnear-agent.lossnear-system.svc.cluster.local:8080"),
+  AGENT_TOKEN: z.string().default(""),
 });
 
 let cached: z.infer<typeof schema> | null = null;
@@ -20,6 +26,8 @@ export function env() {
       DATABASE_URL: process.env.DATABASE_URL,
       ADMIN_USER: process.env.ADMIN_USER,
       ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH,
+      AGENT_URL: process.env.AGENT_URL,
+      AGENT_TOKEN: process.env.AGENT_TOKEN,
     });
   }
   return cached;

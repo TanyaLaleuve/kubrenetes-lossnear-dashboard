@@ -3,6 +3,8 @@ node_modules
 .git
 .github
 k8s
+agent
+deploy
 *.md
 .env*
 !.env.example

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
-import { ArrowLeft, Play, RotateCw, Skull, Square } from "lucide-react";
+import { ArrowLeft, FolderOpen, Play, RotateCw, Skull, Square } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -134,6 +134,13 @@ export default async function ServerDetailPage({
             Kill
           </ServerActionButton>
         )}
+        <Link
+          href={`/servers/${server.id}/files`}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+        >
+          <FolderOpen className="size-4" aria-hidden />
+          Fichiers
+        </Link>
         <div className="ml-auto">
           <ConfirmButton
             action={deleteServer.bind(null, server.id)}
