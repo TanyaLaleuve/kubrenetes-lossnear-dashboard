@@ -33,4 +33,8 @@ export async function register() {
       .set({ isAdmin: true, canCreateServers: true })
       .where(sql`lower(${schema.users.username}) = ${env().ADMIN_USER.toLowerCase()} and ${schema.users.isAdmin} = false`);
   }
+
+  // Surveillance anti crash-loop des serveurs custom.
+  const { startCrashLoopReconciler } = await import("@/lib/servers/reconcile");
+  startCrashLoopReconciler();
 }
