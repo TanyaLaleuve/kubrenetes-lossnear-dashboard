@@ -5,11 +5,13 @@ import { usePathname } from "next/navigation";
 import {
   Boxes,
   Cog,
+  Gamepad2,
   Layers,
   LayoutDashboard,
   LogOut,
   Server,
   SquareStack,
+  Users,
 } from "lucide-react";
 import { logout } from "@/lib/auth/actions";
 import { Avatar } from "@/components/Avatar";
@@ -19,14 +21,20 @@ type NavUser = {
   username: string;
   hasAvatar: boolean;
   avatarVersion: number;
+  isAdmin: boolean;
 };
 
 const mainLinks = [
   { href: "/", label: "Vue d'ensemble", icon: LayoutDashboard },
+  { href: "/servers", label: "Serveurs", icon: Gamepad2 },
   { href: "/pods", label: "Pods", icon: Boxes },
   { href: "/workloads", label: "Workloads", icon: SquareStack },
   { href: "/system", label: "Système", icon: Cog },
 ];
+
+/* Nav mobile limitée à 5 entrées : Workloads reste accessible via la sidebar
+   desktop et les liens de la vue d'ensemble. */
+const mobileLinks = mainLinks.filter((l) => l.href !== "/workloads");
 
 const clusterLinks = [
   { href: "/nodes", label: "Nœuds", icon: Server },
@@ -92,6 +100,19 @@ export function Nav({ user }: { user: NavUser }) {
               active={isActive(pathname, link.href)}
             />
           ))}
+          {user.isAdmin && (
+            <>
+              <p className="px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Administration
+              </p>
+              <SidebarLink
+                href="/admin/users"
+                label="Utilisateurs"
+                icon={Users}
+                active={isActive(pathname, "/admin/users")}
+              />
+            </>
+          )}
         </nav>
         <div className="space-y-1 border-t border-border p-3">
           <Link
@@ -128,7 +149,7 @@ export function Nav({ user }: { user: NavUser }) {
         aria-label="Navigation principale"
         className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
-        {mainLinks.map(({ href, label, icon: Icon }) => (
+        {mobileLinks.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

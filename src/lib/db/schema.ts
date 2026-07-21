@@ -1,6 +1,9 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   customType,
+  integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -37,6 +40,14 @@ export const users = pgTable(
     avatar: bytea("avatar"),
     /** Compte Discord lié (OAuth à venir). */
     discordId: varchar("discord_id", { length: 32 }).unique(),
+    /** Super-admin du panel : gère les droits et quotas des autres comptes. */
+    isAdmin: boolean("is_admin").notNull().default(false),
+    /** Droit de créer des serveurs custom (accordé par un admin). */
+    canCreateServers: boolean("can_create_servers").notNull().default(false),
+    quotaMaxServers: integer("quota_max_servers").notNull().default(1),
+    quotaMemoryMi: integer("quota_memory_mi").notNull().default(4096),
+    quotaCpuMilli: integer("quota_cpu_milli").notNull().default(2000),
+    quotaDiskGi: integer("quota_disk_gi").notNull().default(10),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -46,3 +57,43 @@ export const users = pgTable(
 );
 
 export type User = typeof users.$inferSelect;
+
+export const serverState = pgEnum("server_state", ["running", "stopped"]);
+
+/**
+ * Serveurs custom (jeu, bot, autre) provisionnés dans le namespace
+ * lossnear-servers : 1 serveur = StatefulSet + PVC + Service headless.
+ * Le port hôte est unique sur la plage 25600-25699 (ouverte dans ufw).
+ */
+export const servers = pgTable(
+  "servers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 48 }).notNull(),
+    /** Identifiant DNS-safe utilisé pour les objets Kubernetes. */
+    slug: varchar("slug", { length: 40 }).notNull().unique(),
+    image: text("image").notNull(),
+    /** Arguments de démarrage optionnels (découpés sur les espaces). */
+    command: text("command"),
+    env: jsonb("env").$type<Record<string, string>>().notNull().default({}),
+    hostPort: integer("host_port").notNull().unique(),
+    containerPort: integer("container_port").notNull().default(25565),
+    cpuMilli: integer("cpu_milli").notNull(),
+    memoryMi: integer("memory_mi").notNull(),
+    diskGi: integer("disk_gi").notNull(),
+    desiredState: serverState("desired_state").notNull().default("stopped"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("servers_owner_name_lower_idx").on(
+      table.ownerId,
+      sql`lower(${table.name})`,
+    ),
+  ],
+);
+
+export type Server = typeof servers.$inferSelect;

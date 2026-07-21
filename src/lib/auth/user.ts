@@ -11,6 +11,12 @@ export type SafeUser = {
   origin: "k8s" | "minecraft" | "bot";
   hasAvatar: boolean;
   discordId: string | null;
+  isAdmin: boolean;
+  canCreateServers: boolean;
+  quotaMaxServers: number;
+  quotaMemoryMi: number;
+  quotaCpuMilli: number;
+  quotaDiskGi: number;
   /** Epoch ms de la dernière modification — sert de cache-buster avatar. */
   updatedAt: number;
 };
@@ -26,6 +32,12 @@ export async function currentUser(): Promise<SafeUser> {
       origin: schema.users.origin,
       avatar: schema.users.avatar,
       discordId: schema.users.discordId,
+      isAdmin: schema.users.isAdmin,
+      canCreateServers: schema.users.canCreateServers,
+      quotaMaxServers: schema.users.quotaMaxServers,
+      quotaMemoryMi: schema.users.quotaMemoryMi,
+      quotaCpuMilli: schema.users.quotaCpuMilli,
+      quotaDiskGi: schema.users.quotaDiskGi,
       updatedAt: schema.users.updatedAt,
     })
     .from(schema.users)
@@ -43,6 +55,12 @@ export async function currentUser(): Promise<SafeUser> {
     origin: user.origin,
     hasAvatar: user.avatar !== null,
     discordId: user.discordId,
+    isAdmin: user.isAdmin,
+    canCreateServers: user.canCreateServers,
+    quotaMaxServers: user.quotaMaxServers,
+    quotaMemoryMi: user.quotaMemoryMi,
+    quotaCpuMilli: user.quotaCpuMilli,
+    quotaDiskGi: user.quotaDiskGi,
     updatedAt: user.updatedAt.valueOf(),
   };
 }

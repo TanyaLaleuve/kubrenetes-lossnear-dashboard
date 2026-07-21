@@ -24,10 +24,10 @@ echo "=== Import dans containerd (k8s.io) ==="
 docker save "$IMAGE" | ctr -n k8s.io images import -
 
 echo "=== Apply manifests ==="
-kubectl apply -f "$DIR/k8s/namespace.yaml"
-kubectl apply -f "$DIR/k8s/rbac.yaml"
-kubectl apply -f "$DIR/k8s/deployment.yaml"
-kubectl apply -f "$DIR/k8s/ingress.yaml"
+for manifest in "$DIR"/k8s/*.yaml; do
+  [[ "$manifest" == *secret.example* ]] && continue
+  kubectl apply -f "$manifest"
+done
 
 echo "=== Rollout ==="
 kubectl -n lossnear-system rollout restart deployment/k8s-dashboard
