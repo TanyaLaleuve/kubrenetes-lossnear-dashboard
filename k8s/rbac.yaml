@@ -20,6 +20,10 @@ rules:
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
+  # Console des serveurs custom : envoi de commandes sur le stdin du pod
+  - apiGroups: [""]
+    resources: ["pods/attach"]
+    verbs: ["get", "create"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "update", "patch"]

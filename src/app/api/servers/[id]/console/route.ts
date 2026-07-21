@@ -44,6 +44,7 @@ export async function GET(
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
+          "X-Accel-Buffering": "no",
         },
       },
     );
@@ -85,6 +86,9 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      // Désactive le buffering des deux nginx (hôte + ingress) : sans ça,
+      // le flux SSE reste en tampon et rien n'atteint le navigateur.
+      "X-Accel-Buffering": "no",
     },
   });
 }
