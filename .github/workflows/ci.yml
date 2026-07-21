@@ -23,6 +23,7 @@ jobs:
       - run: npm run build
         env:
           SESSION_SECRET: ci-only-secret-not-used-in-production-0000
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
           ADMIN_USER: ci
           ADMIN_PASSWORD_HASH: $2a$12$ciplaceholderciplaceholderciplacehold
 

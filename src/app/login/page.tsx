@@ -27,12 +27,12 @@ export default function LoginPage() {
           className="space-y-4 rounded-xl border border-border bg-card p-5"
         >
           <div className="space-y-1.5">
-            <label htmlFor="username" className="text-sm font-medium">
-              Utilisateur
+            <label htmlFor="identifier" className="text-sm font-medium">
+              Utilisateur ou email
             </label>
             <input
-              id="username"
-              name="username"
+              id="identifier"
+              name="identifier"
               autoComplete="username"
               required
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none transition-colors duration-150 focus:border-accent"

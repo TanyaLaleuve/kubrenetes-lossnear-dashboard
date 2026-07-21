@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Activity, Boxes, Server, SquareStack } from "lucide-react";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { StatCard } from "@/components/StatCard";
@@ -9,6 +10,7 @@ import {
   nodeMetrics,
   recentEvents,
 } from "@/lib/k8s/resources";
+import { isSystemNamespace } from "@/lib/k8s/namespaces";
 import {
   formatAge,
   formatBytes,
@@ -29,12 +31,22 @@ export default async function OverviewPage() {
     recentEvents(10).catch(() => []),
   ]);
 
-  const runningPods = pods.filter((p) => podStatus(p).tone === "ok").length;
-  const problemPods = pods.filter((p) => podStatus(p).tone === "error").length;
+  // La vue d'ensemble met en avant les applications lossnear ;
+  // l'infrastructure vit sur la page /system.
+  const appPods = pods.filter((p) => !isSystemNamespace(p.metadata?.namespace));
+  const appDeployments = deployments.filter(
+    (d) => !isSystemNamespace(d.metadata?.namespace),
+  );
+  const runningPods = appPods.filter((p) => podStatus(p).tone === "ok").length;
+  const problemPods = appPods.filter((p) => podStatus(p).tone === "error").length;
+  const systemProblemPods = pods.filter(
+    (p) =>
+      isSystemNamespace(p.metadata?.namespace) && podStatus(p).tone === "error",
+  ).length;
   const readyNodes = nodes.filter((n) =>
     n.status?.conditions?.some((c) => c.type === "Ready" && c.status === "True"),
   ).length;
-  const readyDeployments = deployments.filter(
+  const readyDeployments = appDeployments.filter(
     (d) => (d.status?.readyReplicas ?? 0) === (d.spec?.replicas ?? 0),
   ).length;
 
@@ -52,30 +64,42 @@ export default async function OverviewPage() {
         aria-label="Statistiques du cluster"
         className="grid grid-cols-2 gap-3 lg:grid-cols-4"
       >
-        <StatCard
-          label="Nœuds"
-          value={`${readyNodes}/${nodes.length}`}
-          detail="prêts"
-          icon={<Server className="size-4" aria-hidden />}
-        />
-        <StatCard
-          label="Pods"
-          value={`${runningPods}/${pods.length}`}
-          detail={problemPods > 0 ? `${problemPods} en erreur` : "tous sains"}
-          icon={<Boxes className="size-4" aria-hidden />}
-        />
-        <StatCard
-          label="Deployments"
-          value={`${readyDeployments}/${deployments.length}`}
-          detail="prêts"
-          icon={<SquareStack className="size-4" aria-hidden />}
-        />
-        <StatCard
-          label="Namespaces"
-          value={new Set(pods.map((p) => p.metadata?.namespace)).size}
-          detail="actifs"
-          icon={<Activity className="size-4" aria-hidden />}
-        />
+        <Link href="/nodes">
+          <StatCard
+            label="Nœuds"
+            value={`${readyNodes}/${nodes.length}`}
+            detail="prêts"
+            icon={<Server className="size-4" aria-hidden />}
+          />
+        </Link>
+        <Link href="/pods">
+          <StatCard
+            label="Pods apps"
+            value={`${runningPods}/${appPods.length}`}
+            detail={problemPods > 0 ? `${problemPods} en erreur` : "tous sains"}
+            icon={<Boxes className="size-4" aria-hidden />}
+          />
+        </Link>
+        <Link href="/workloads">
+          <StatCard
+            label="Deployments apps"
+            value={`${readyDeployments}/${appDeployments.length}`}
+            detail="prêts"
+            icon={<SquareStack className="size-4" aria-hidden />}
+          />
+        </Link>
+        <Link href="/system">
+          <StatCard
+            label="Système"
+            value={systemProblemPods > 0 ? `${systemProblemPods} err.` : "OK"}
+            detail={
+              systemProblemPods > 0
+                ? "pods système en erreur"
+                : "infrastructure saine"
+            }
+            icon={<Activity className="size-4" aria-hidden />}
+          />
+        </Link>
       </section>
 
       <section aria-label="Ressources par nœud" className="space-y-3">

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { env } from "@/lib/env";
 
 export type SessionData = {
-  username?: string;
+  userId?: string;
   loggedIn: boolean;
 };
 
@@ -36,10 +36,10 @@ export async function getSession() {
 }
 
 /** Garde des pages : redirige vers /login si non connecté. */
-export async function requireSession(): Promise<SessionData> {
+export async function requireSession(): Promise<SessionData & { userId: string }> {
   const session = await getSession();
-  if (!session.loggedIn) {
+  if (!session.loggedIn || !session.userId) {
     redirect("/login");
   }
-  return session;
+  return session as SessionData & { userId: string };
 }

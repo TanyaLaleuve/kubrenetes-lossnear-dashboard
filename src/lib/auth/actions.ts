@@ -1,9 +1,10 @@
 "use server";
 
 import { compare } from "bcryptjs";
+import { eq, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { env } from "@/lib/env";
+import { db, schema } from "@/lib/db";
 import { getSession } from "./session";
 
 // Anti brute-force en mémoire : suffisant pour un déploiement mono-replica
@@ -29,13 +30,25 @@ export async function login(
     return { error: "Trop de tentatives. Réessaie dans 15 minutes." };
   }
 
-  const username = String(formData.get("username") ?? "");
+  const identifier = String(formData.get("identifier") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  const userOk = username === env().ADMIN_USER;
-  const passwordOk = await compare(password, env().ADMIN_PASSWORD_HASH);
+  const rows = await db()
+    .select()
+    .from(schema.users)
+    .where(
+      or(eq(schema.users.username, identifier), eq(schema.users.email, identifier)),
+    )
+    .limit(1);
+  const user = rows[0];
 
-  if (!userOk || !passwordOk) {
+  // Cascade de comptes : seuls les comptes d'origine "k8s" (niveau parent)
+  // peuvent se connecter à ce dashboard.
+  const allowed = user !== undefined && user.origin === "k8s";
+  const passwordOk =
+    allowed && (await compare(password, user.passwordHash));
+
+  if (!passwordOk) {
     const count = (entry?.count ?? 0) + 1;
     attempts.set(ip, {
       count,
@@ -46,7 +59,7 @@ export async function login(
 
   attempts.delete(ip);
   const session = await getSession();
-  session.username = username;
+  session.userId = user.id;
   session.loggedIn = true;
   await session.save();
   redirect("/");
