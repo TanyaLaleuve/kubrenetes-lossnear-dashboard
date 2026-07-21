@@ -1,7 +1,7 @@
 "use server";
 
 import { compare } from "bcryptjs";
-import { eq, or } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { db, schema } from "@/lib/db";
@@ -33,11 +33,16 @@ export async function login(
   const identifier = String(formData.get("identifier") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
+  // Connexion insensible à la casse (username comme email), affichage préservé.
+  const lowered = identifier.toLowerCase();
   const rows = await db()
     .select()
     .from(schema.users)
     .where(
-      or(eq(schema.users.username, identifier), eq(schema.users.email, identifier)),
+      or(
+        sql`lower(${schema.users.username}) = ${lowered}`,
+        eq(schema.users.email, lowered),
+      ),
     )
     .limit(1);
   const user = rows[0];
