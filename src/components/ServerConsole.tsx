@@ -99,7 +99,19 @@ export function ServerConsole({
           {running && lines.length === 0 && (
             <p className="text-muted-foreground">Connexion à la console…</p>
           )}
-          {lines.map((line, index) => (
+          {lines.map((line, index) =>
+            line === "SERVER_LOGS" ? (
+              <div
+                key={index}
+                className="my-2 flex items-center gap-2 text-accent"
+              >
+                <span className="h-px flex-1 bg-accent/40" />
+                <span className="text-[10px] font-semibold tracking-widest uppercase">
+                  Logs du serveur
+                </span>
+                <span className="h-px flex-1 bg-accent/40" />
+              </div>
+            ) : (
             <div
               key={index}
               className={`break-all whitespace-pre-wrap ${
@@ -108,7 +120,8 @@ export function ServerConsole({
             >
               {line || " "}
             </div>
-          ))}
+            ),
+          )}
         </div>
         <form
           onSubmit={send}

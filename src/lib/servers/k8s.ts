@@ -43,9 +43,12 @@ function buildStatefulSet(server: Server): V1StatefulSet {
                 name,
                 value,
               })),
-              // stdin/tty : nécessaires pour la console interactive (phase 2)
+              // stdin ouvert pour l'envoi de commandes (attach), mais SANS
+              // pseudo-terminal : avec un tty, Minecraft dessine des barres de
+              // progression ANSI qui polluent la console. Sans tty, il écrit
+              // des logs texte propres.
               stdin: true,
-              tty: true,
+              tty: false,
               ports: [
                 {
                   name: "game",

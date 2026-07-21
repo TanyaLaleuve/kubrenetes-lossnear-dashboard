@@ -52,7 +52,7 @@ export async function POST(
       devNull,
       devNull,
       stdin,
-      true,
+      false, // pas de tty : cohérent avec le conteneur (stdin simple)
     );
     stdin.push(parsed.data.command + "\n");
     // Laisse le temps à la trame stdin de partir avant de fermer la socket.

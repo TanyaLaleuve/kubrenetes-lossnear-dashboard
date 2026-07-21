@@ -32,6 +32,23 @@ export async function GET(
   const logClient = new Log(getKubeConfig());
   const encoder = new TextEncoder();
 
+  // Marqueur inséré au passage prépa -> logs serveur (rendu comme séparateur).
+  const SEPARATOR = "SERVER_LOGS";
+
+  // Séquences ANSI (couleurs, déplacements curseur) et caractères de contrôle.
+  const ANSI = new RegExp(
+    "\\x1b\\[[0-9;?]*[A-Za-z]|\\x1b\\][^\\x07]*\\x07|[\\x00-\\x08\\x0b-\\x1f]",
+    "g",
+  );
+  // Nettoie une ligne de log : ne garde que la dernière frame d'une barre de
+  // progression (réécrite via \r) puis retire l'ANSI et les caractères de
+  // contrôle — sinon un \r casse le protocole SSE.
+  const sanitizeLog = (raw: string): string => {
+    const lastCr = raw.lastIndexOf("\r");
+    const frame = lastCr >= 0 ? raw.slice(lastCr + 1) : raw;
+    return frame.replace(ANSI, "");
+  };
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let closed = false;
@@ -40,7 +57,9 @@ export async function GET(
       const send = (line: string) => {
         if (closed) return;
         try {
-          controller.enqueue(encoder.encode(`data: ${line}\n\n`));
+          // Garde-fou SSE : un \r ou \n résiduel briserait la trame data:.
+          const safe = line.replace(/[\r\n]+/g, " ");
+          controller.enqueue(encoder.encode(`data: ${safe}\n\n`));
         } catch {
           closed = true;
         }
@@ -92,7 +111,7 @@ export async function GET(
             buffer += chunk.toString("utf8");
             const lines = buffer.split("\n");
             buffer = lines.pop() ?? "";
-            for (const line of lines) send(line);
+            for (const line of lines) send(sanitizeLog(line));
           });
           const done = () => resolve();
           source.on("end", done);
@@ -135,7 +154,7 @@ export async function GET(
 
         const state = pod.status?.containerStatuses?.[0]?.state;
         if (state?.running) {
-          send("[système] Conteneur démarré — logs en direct :");
+          send(SEPARATOR);
           await streamLogs();
           activeLogAbort = null;
           if (!closed) {
