@@ -22,6 +22,8 @@ spec:
       serviceAccountName: k8s-dashboard
       securityContext:
         runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
       containers:
         - name: dashboard
           image: ghcr.io/tanyalaleuve/kubrenetes-lossnear-dashboard:latest
