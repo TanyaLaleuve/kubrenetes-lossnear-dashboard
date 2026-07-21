@@ -100,7 +100,12 @@ export function ServerConsole({
             <p className="text-muted-foreground">Connexion à la console…</p>
           )}
           {lines.map((line, index) => (
-            <div key={index} className="break-all whitespace-pre-wrap">
+            <div
+              key={index}
+              className={`break-all whitespace-pre-wrap ${
+                line.startsWith("[système]") ? "text-info italic" : ""
+              }`}
+            >
               {line || " "}
             </div>
           ))}

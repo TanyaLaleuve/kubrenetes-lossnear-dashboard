@@ -73,7 +73,9 @@ export default async function ServerDetailPage({
   const podMetric = metrics.find((m) => m.metadata.name === `${server.slug}-0`);
 
   const running = server.desiredState === "running";
-  const consoleLive = status.label === "Running" || status.label === "Starting";
+  // Console active dès que le serveur est censé tourner ou qu'un pod existe
+  // (elle affiche les événements de démarrage avant les logs).
+  const consoleLive = running || status.pod !== undefined;
 
   return (
     <div className="space-y-6">
