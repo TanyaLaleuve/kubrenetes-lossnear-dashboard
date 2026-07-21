@@ -12,8 +12,22 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Serveurs" };
 
-export default async function ServersPage() {
+const SORTS = [
+  { key: "name", label: "Nom" },
+  { key: "created", label: "Récents" },
+  { key: "status", label: "Statut" },
+] as const;
+
+const STATUS_ORDER = { Running: 0, Starting: 1, Stopping: 2, Error: 3, Stopped: 4 };
+
+export default async function ServersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string }>;
+}) {
   const user = await currentUser();
+  const { sort: sortParam } = await searchParams;
+  const sort = SORTS.some((s) => s.key === sortParam) ? sortParam : "name";
 
   const rows = await db()
     .select()
@@ -29,6 +43,20 @@ export default async function ServersPage() {
       })),
     })),
   );
+
+  withStatus.sort((a, b) => {
+    if (sort === "created") {
+      return b.server.createdAt.valueOf() - a.server.createdAt.valueOf();
+    }
+    if (sort === "status") {
+      const diff =
+        STATUS_ORDER[a.status.label] - STATUS_ORDER[b.status.label];
+      if (diff !== 0) return diff;
+    }
+    return a.server.name.localeCompare(b.server.name, "fr", {
+      sensitivity: "base",
+    });
+  });
 
   const canCreate = user.canCreateServers || user.isAdmin;
 
@@ -53,6 +81,24 @@ export default async function ServersPage() {
           </Link>
         )}
       </header>
+
+      {withStatus.length > 1 && (
+        <nav aria-label="Tri" className="flex gap-2">
+          {SORTS.map(({ key, label }) => (
+            <Link
+              key={key}
+              href={`/servers?sort=${key}`}
+              className={`rounded-full border px-3 py-1 text-xs transition-colors duration-150 ${
+                sort === key
+                  ? "border-accent/40 bg-accent/10 text-accent"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+      )}
 
       {withStatus.length === 0 && (
         <p className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">

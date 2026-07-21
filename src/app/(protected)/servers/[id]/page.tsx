@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
-import { ArrowLeft, FileText, Play, RotateCw, Square } from "lucide-react";
+import { asc, eq } from "drizzle-orm";
+import { ArrowLeft, Play, RotateCw, Square } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { ServerActionButton } from "@/components/ServerActionButton";
+import { ServerAddress } from "@/components/ServerAddress";
+import { ServerConsole } from "@/components/ServerConsole";
+import { ServerOwner } from "@/components/ServerOwner";
 import { StatusBadge } from "@/components/StatusBadge";
 import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
@@ -14,9 +17,16 @@ import {
   startServer,
   stopServer,
 } from "@/lib/servers/actions";
+import { PUBLIC_IP } from "@/lib/servers/constants";
 import { SERVERS_NAMESPACE, serverRuntimeStatus } from "@/lib/servers/k8s";
 import { podMetrics } from "@/lib/k8s/resources";
-import { formatAge, formatBytes, formatCpu, parseCpu, parseMemory } from "@/lib/k8s/format";
+import {
+  formatAge,
+  formatBytes,
+  formatCpu,
+  parseCpu,
+  parseMemory,
+} from "@/lib/k8s/format";
 
 export const dynamic = "force-dynamic";
 
@@ -39,25 +49,35 @@ export default async function ServerDetailPage({
   if (!server) notFound();
   if (server.ownerId !== user.id && !user.isAdmin) redirect("/servers");
 
-  const status = await serverRuntimeStatus(server).catch(() => ({
-    label: "Error" as const,
-    tone: "error" as const,
-    pod: undefined,
-  }));
+  const [status, users, ownerRow] = await Promise.all([
+    serverRuntimeStatus(server).catch(() => ({
+      label: "Error" as const,
+      tone: "error" as const,
+      pod: undefined,
+    })),
+    db()
+      .select({ id: schema.users.id, username: schema.users.username })
+      .from(schema.users)
+      .orderBy(asc(schema.users.username)),
+    db()
+      .select({ username: schema.users.username })
+      .from(schema.users)
+      .where(eq(schema.users.id, server.ownerId))
+      .limit(1),
+  ]);
 
   const metrics =
     status.label === "Running"
       ? await podMetrics(SERVERS_NAMESPACE).catch(() => [])
       : [];
-  const podMetric = metrics.find(
-    (m) => m.metadata.name === `${server.slug}-0`,
-  );
+  const podMetric = metrics.find((m) => m.metadata.name === `${server.slug}-0`);
 
   const running = server.desiredState === "running";
+  const consoleLive = status.label === "Running" || status.label === "Starting";
 
   return (
     <div className="space-y-6">
-      <AutoRefresh seconds={8} />
+      <AutoRefresh seconds={10} />
       <header className="flex flex-wrap items-center gap-3">
         <Link
           href="/servers"
@@ -70,7 +90,7 @@ export default async function ServerDetailPage({
           <h1 className="truncate font-mono text-lg font-semibold">
             {server.name}
           </h1>
-          <p className="text-xs text-muted-foreground">
+          <p className="truncate text-xs text-muted-foreground">
             {server.image} · créé {formatAge(server.createdAt)}
           </p>
         </div>
@@ -101,15 +121,6 @@ export default async function ServerDetailPage({
             </ServerActionButton>
           </>
         )}
-        {status.pod && (
-          <Link
-            href={`/pods/${SERVERS_NAMESPACE}/${server.slug}-0/logs`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-          >
-            <FileText className="size-4" aria-hidden />
-            Logs
-          </Link>
-        )}
         <div className="ml-auto">
           <ConfirmButton
             action={deleteServer.bind(null, server.id)}
@@ -120,13 +131,17 @@ export default async function ServerDetailPage({
         </div>
       </section>
 
+      <ServerConsole serverId={server.id} running={consoleLive} />
+
       <section
         aria-label="Informations"
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <Info label="Adresse">
-          <span className="font-mono">103.109.234.50:{server.hostPort}</span>
-        </Info>
+        <ServerAddress
+          serverId={server.id}
+          address={server.displayAddress}
+          fallback={`${PUBLIC_IP}:${server.hostPort}`}
+        />
         <Info label="RAM">
           {podMetric
             ? `${formatBytes(parseMemory(podMetric.containers[0]?.usage.memory ?? "0"))} / ${server.memoryMi} Mio`
@@ -140,13 +155,19 @@ export default async function ServerDetailPage({
         <Info label="Disque">{server.diskGi} Gio (persistant)</Info>
       </section>
 
-      {Object.keys(server.env).length > 0 && (
-        <section aria-label="Variables d'environnement">
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">
-            Variables d&apos;environnement
-          </h2>
-          <div className="overflow-x-auto rounded-xl border border-border bg-card p-4">
-            <dl className="space-y-1 font-mono text-xs">
+      <section aria-label="Propriété" className="grid gap-3 sm:grid-cols-2">
+        <ServerOwner
+          serverId={server.id}
+          ownerId={server.ownerId}
+          ownerName={ownerRow[0]?.username ?? "?"}
+          users={users}
+        />
+        {Object.keys(server.env).length > 0 && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Variables d&apos;environnement
+            </p>
+            <dl className="mt-1.5 space-y-1 overflow-x-auto font-mono text-xs">
               {Object.entries(server.env).map(([key, value]) => (
                 <div key={key} className="flex gap-2">
                   <dt className="text-accent">{key}=</dt>
@@ -155,8 +176,8 @@ export default async function ServerDetailPage({
               ))}
             </dl>
           </div>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   );
 }

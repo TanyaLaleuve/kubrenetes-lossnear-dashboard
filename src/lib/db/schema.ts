@@ -81,6 +81,8 @@ export const servers = pgTable(
     env: jsonb("env").$type<Record<string, string>>().notNull().default({}),
     hostPort: integer("host_port").notNull().unique(),
     containerPort: integer("container_port").notNull().default(25565),
+    /** Adresse affichée aux joueurs (ex. play.lossnear.com) à la place de IP:port. */
+    displayAddress: varchar("display_address", { length: 255 }),
     cpuMilli: integer("cpu_milli").notNull(),
     memoryMi: integer("memory_mi").notNull(),
     diskGi: integer("disk_gi").notNull(),

@@ -57,13 +57,16 @@ export function ServerCreateForm({
         <input
           id="image"
           name="image"
-          required
           placeholder="itzg/minecraft-server:latest"
           className={`${inputClass} font-mono`}
         />
         <p className="text-xs text-muted-foreground">
-          Minecraft : <code className="font-mono">itzg/minecraft-server:latest</code>{" "}
-          (variable EULA=TRUE requise, TYPE=PAPER pour Paper).
+          Vide = valeur du placeholder. Minecraft récent :{" "}
+          <code className="font-mono">itzg/minecraft-server:latest</code>. Vieilles
+          versions (1.8.x à 1.16, Java 8) :{" "}
+          <code className="font-mono">itzg/minecraft-server:java8-multiarch</code>{" "}
+          avec <code className="font-mono">VERSION=1.8.8</code>. EULA=TRUE requis,
+          TYPE=PAPER pour Paper.
         </p>
       </div>
 

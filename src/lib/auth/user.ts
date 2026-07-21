@@ -2,7 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/lib/db";
-import { requireSession } from "./session";
+import { getSession } from "./session";
 
 export type SafeUser = {
   id: string;
@@ -21,9 +21,11 @@ export type SafeUser = {
   updatedAt: number;
 };
 
-/** Utilisateur connecté (sans données sensibles). Redirige si session orpheline. */
-export async function currentUser(): Promise<SafeUser> {
-  const session = await requireSession();
+/** Utilisateur connecté ou null (usage API routes). */
+export async function sessionUser(): Promise<SafeUser | null> {
+  const session = await getSession();
+  if (!session.loggedIn || !session.userId) return null;
+
   const rows = await db()
     .select({
       id: schema.users.id,
@@ -45,9 +47,7 @@ export async function currentUser(): Promise<SafeUser> {
     .limit(1);
 
   const user = rows[0];
-  if (!user) {
-    redirect("/login");
-  }
+  if (!user) return null;
   return {
     id: user.id,
     username: user.username,
@@ -63,4 +63,13 @@ export async function currentUser(): Promise<SafeUser> {
     quotaDiskGi: user.quotaDiskGi,
     updatedAt: user.updatedAt.valueOf(),
   };
+}
+
+/** Utilisateur connecté (pages). Redirige vers /login si session invalide. */
+export async function currentUser(): Promise<SafeUser> {
+  const user = await sessionUser();
+  if (!user) {
+    redirect("/login");
+  }
+  return user;
 }

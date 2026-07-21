@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
-import { currentUser, type SafeUser } from "@/lib/auth/user";
+import { currentUser } from "@/lib/auth/user";
+import { loadServerFor } from "./authz";
+import { DEFAULT_IMAGE } from "./constants";
 import {
   applyServer,
   destroyServer,
@@ -21,15 +23,18 @@ const createSchema = z.object({
     .trim()
     .min(3, "Nom : 3 caractères minimum")
     .max(48, "Nom : 48 caractères maximum"),
-  image: z
-    .string()
-    .trim()
-    .min(3)
-    .max(255)
-    .regex(
-      /^[a-z0-9][a-z0-9._\/:@-]*$/i,
-      "Image Docker invalide (ex. itzg/minecraft-server:latest)",
-    ),
+  image: z.preprocess(
+    (value) => (typeof value === "string" && value.trim() === "" ? DEFAULT_IMAGE : value),
+    z
+      .string()
+      .trim()
+      .min(3)
+      .max(255)
+      .regex(
+        /^[a-z0-9][a-z0-9._\/:@-]*$/i,
+        "Image Docker invalide (ex. itzg/minecraft-server:latest)",
+      ),
+  ),
   command: z.string().trim().max(500).optional(),
   containerPort: z.coerce.number().int().min(1).max(65535).default(25565),
   cpuMilli: z.coerce.number().int().min(250).max(16000),
@@ -48,20 +53,6 @@ function slugify(name: string): string {
     .slice(0, 32);
   const suffix = Math.random().toString(36).slice(2, 6);
   return `srv-${base || "server"}-${suffix}`.slice(0, 40);
-}
-
-async function loadOwnedServer(id: string, user: SafeUser) {
-  const rows = await db()
-    .select()
-    .from(schema.servers)
-    .where(eq(schema.servers.id, id))
-    .limit(1);
-  const server = rows[0];
-  if (!server) throw new Error("Serveur introuvable");
-  if (server.ownerId !== user.id && !user.isAdmin) {
-    throw new Error("Accès refusé");
-  }
-  return server;
 }
 
 export async function createServer(
@@ -153,7 +144,7 @@ export async function createServer(
 
 async function setDesiredState(id: string, state: "running" | "stopped") {
   const user = await currentUser();
-  const server = await loadOwnedServer(id, user);
+  const server = await loadServerFor(user, id);
   const [updated] = await db()
     .update(schema.servers)
     .set({ desiredState: state, updatedAt: new Date() })
@@ -174,7 +165,7 @@ export async function stopServer(id: string) {
 
 export async function restartServer(id: string) {
   const user = await currentUser();
-  const server = await loadOwnedServer(id, user);
+  const server = await loadServerFor(user, id);
   if (server.desiredState !== "running") {
     throw new Error("Le serveur n'est pas démarré.");
   }
@@ -190,11 +181,66 @@ export async function restartServer(id: string) {
 
 export async function deleteServer(id: string) {
   const user = await currentUser();
-  const server = await loadOwnedServer(id, user);
+  const server = await loadServerFor(user, id);
   await destroyServer(server);
   await db().delete(schema.servers).where(eq(schema.servers.id, server.id));
   revalidatePath("/servers");
   redirect("/servers");
+}
+
+const addressSchema = z
+  .string()
+  .trim()
+  .max(255)
+  .regex(/^[a-z0-9.:-]*$/i, "Adresse invalide (ex. play.lossnear.com)");
+
+/** Adresse affichée aux joueurs (domaine) — owner ou admin. Vide = IP:port. */
+export async function updateServerAddress(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const id = String(formData.get("serverId") ?? "");
+  const server = await loadServerFor(user, id);
+
+  const parsed = addressSchema.safeParse(formData.get("displayAddress") ?? "");
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  await db()
+    .update(schema.servers)
+    .set({ displayAddress: parsed.data || null, updatedAt: new Date() })
+    .where(eq(schema.servers.id, server.id));
+  revalidatePath(`/servers/${id}`);
+  return {};
+}
+
+/** Transfert de propriété — owner actuel ou admin. */
+export async function transferServer(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const id = String(formData.get("serverId") ?? "");
+  const newOwnerId = String(formData.get("newOwnerId") ?? "");
+  const server = await loadServerFor(user, id);
+
+  if (!z.string().uuid().safeParse(newOwnerId).success) {
+    return { error: "Utilisateur invalide." };
+  }
+  const target = await db()
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(eq(schema.users.id, newOwnerId))
+    .limit(1);
+  if (!target[0]) return { error: "Utilisateur introuvable." };
+
+  await db()
+    .update(schema.servers)
+    .set({ ownerId: newOwnerId, updatedAt: new Date() })
+    .where(eq(schema.servers.id, server.id));
+  revalidatePath(`/servers/${id}`);
+  revalidatePath("/servers");
+  return {};
 }
 
 // ---- Administration (droits + quotas) ----
