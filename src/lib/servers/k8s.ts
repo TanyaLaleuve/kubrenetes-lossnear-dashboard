@@ -31,7 +31,10 @@ function buildStatefulSet(server: Server): V1StatefulSet {
       template: {
         metadata: { labels: labels(server) },
         spec: {
-          terminationGracePeriodSeconds: 60,
+          // Arrêt : laisse le temps d'une sauvegarde propre, mais pas trop
+          // (l'image Minecraft ignore SIGTERM pendant la génération du monde).
+          // Pour un arrêt instantané, utiliser Kill (grace period 0).
+          terminationGracePeriodSeconds: 30,
           containers: [
             {
               name: "server",
