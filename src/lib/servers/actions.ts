@@ -11,8 +11,10 @@ import { DEFAULT_IMAGE } from "./constants";
 import {
   applyServer,
   destroyServer,
+  forceDeletePod,
   HOST_PORT_MAX,
   HOST_PORT_MIN,
+  SERVERS_NAMESPACE,
 } from "./k8s";
 
 export type ServerFormState = { error?: string };
@@ -163,6 +165,21 @@ export async function stopServer(id: string) {
   await setDesiredState(id, "stopped");
 }
 
+/** Arrêt dur immédiat : état arrêté + suppression forcée du pod. */
+export async function killServer(id: string) {
+  const user = await currentUser();
+  const server = await loadServerFor(user, id);
+  const [updated] = await db()
+    .update(schema.servers)
+    .set({ desiredState: "stopped", updatedAt: new Date() })
+    .where(eq(schema.servers.id, server.id))
+    .returning();
+  await applyServer(updated); // scale à 0
+  await forceDeletePod(server.slug); // supprime le pod sans délai de grâce
+  revalidatePath(`/servers/${id}`);
+  revalidatePath("/servers");
+}
+
 export async function restartServer(id: string) {
   const user = await currentUser();
   const server = await loadServerFor(user, id);
@@ -171,7 +188,6 @@ export async function restartServer(id: string) {
   }
   // Suppression du pod : le StatefulSet le recrée aussitôt.
   const { coreApi } = await import("@/lib/k8s/client");
-  const { SERVERS_NAMESPACE } = await import("./k8s");
   await coreApi().deleteNamespacedPod({
     namespace: SERVERS_NAMESPACE,
     name: `${server.slug}-0`,

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
-import { ArrowLeft, Play, RotateCw, Square } from "lucide-react";
+import { ArrowLeft, Play, RotateCw, Skull, Square } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -13,6 +13,7 @@ import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 import {
   deleteServer,
+  killServer,
   restartServer,
   startServer,
   stopServer,
@@ -122,6 +123,16 @@ export default async function ServerDetailPage({
               Redémarrer
             </ServerActionButton>
           </>
+        )}
+        {/* Kill : arrêt dur, visible dès qu'un pod existe (même bloqué). */}
+        {status.pod && (
+          <ServerActionButton
+            action={killServer.bind(null, server.id)}
+            variant="destructive"
+          >
+            <Skull className="size-4" aria-hidden />
+            Kill
+          </ServerActionButton>
         )}
         <div className="ml-auto">
           <ConfirmButton

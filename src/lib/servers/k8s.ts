@@ -130,23 +130,52 @@ export async function applyServer(server: Server): Promise<void> {
     });
   }
 
-  const body = buildStatefulSet(server);
+  const replicas = server.desiredState === "running" ? 1 : 0;
   try {
     await apps.readNamespacedStatefulSet({
       namespace: SERVERS_NAMESPACE,
       name: server.slug,
     });
-    await apps.replaceNamespacedStatefulSet({
-      namespace: SERVERS_NAMESPACE,
-      name: server.slug,
-      body,
-    });
+    // StatefulSet déjà présent : on ne touche qu'au nombre de replicas via le
+    // sous-objet scale (fiable et sans conflit), pas de remplacement complet.
+    await setReplicas(server.slug, replicas);
   } catch (error) {
     if (!(await isNotFound(error))) throw error;
     await apps.createNamespacedStatefulSet({
       namespace: SERVERS_NAMESPACE,
-      body,
+      body: buildStatefulSet(server),
     });
+  }
+}
+
+/** Ajuste le nombre de replicas (start/stop) via le sous-objet scale. */
+export async function setReplicas(
+  slug: string,
+  replicas: number,
+): Promise<void> {
+  const apps = appsApi();
+  const scale = await apps.readNamespacedStatefulSetScale({
+    namespace: SERVERS_NAMESPACE,
+    name: slug,
+  });
+  scale.spec = { ...scale.spec, replicas };
+  await apps.replaceNamespacedStatefulSetScale({
+    namespace: SERVERS_NAMESPACE,
+    name: slug,
+    body: scale,
+  });
+}
+
+/** Supprime le pod immédiatement (grace period 0) — arrêt dur. */
+export async function forceDeletePod(slug: string): Promise<void> {
+  try {
+    await coreApi().deleteNamespacedPod({
+      namespace: SERVERS_NAMESPACE,
+      name: `${slug}-0`,
+      gracePeriodSeconds: 0,
+    });
+  } catch (error) {
+    if (!(await isNotFound(error))) throw error;
   }
 }
 
