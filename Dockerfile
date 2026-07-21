@@ -27,6 +27,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Migrations SQL exécutées au démarrage (instrumentation.ts)
 COPY --from=builder /app/drizzle ./drizzle
+# Binaires natifs sharp/libvips (musl) absents du tracing standalone
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@img ./node_modules/@img
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 
 USER nextjs
 EXPOSE 3000
