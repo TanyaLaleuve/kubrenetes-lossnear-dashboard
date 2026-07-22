@@ -356,6 +356,193 @@ export async function transferServer(
   return {};
 }
 
+const generalSettingsSchema = z.object({
+  serverId: z.string().uuid(),
+  name: z.string().trim().min(3, "Nom : 3 caractères minimum").max(48),
+  ownerId: z.string().uuid().optional(),
+  containerPort: z.coerce.number().int().min(1).max(65535),
+  cpuMilli: z.coerce.number().int().min(250).max(16000),
+  memoryMi: z.coerce.number().int().min(256).max(32768),
+  diskGi: z.coerce.number().int().min(1).max(200),
+  displayAddress: z.string().trim().max(255).optional(),
+});
+
+/** Mise à jour des paramètres généraux (Nom, ressources, ports, propriétaire, adresse). */
+export async function updateServerGeneralSettings(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  const server = await requirePrivileged(user, serverId);
+
+  const parsed = generalSettingsSchema.safeParse({
+    serverId,
+    name: formData.get("name"),
+    ownerId: formData.get("ownerId") || undefined,
+    containerPort: formData.get("containerPort"),
+    cpuMilli: formData.get("cpuMilli"),
+    memoryMi: formData.get("memoryMi"),
+    diskGi: formData.get("diskGi"),
+    displayAddress: formData.get("displayAddress") || undefined,
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+  const input = parsed.data;
+
+  const updateData: Record<string, unknown> = {
+    name: input.name,
+    containerPort: input.containerPort,
+    cpuMilli: input.cpuMilli,
+    memoryMi: input.memoryMi,
+    diskGi: input.diskGi,
+    displayAddress: input.displayAddress || null,
+    updatedAt: new Date(),
+  };
+
+  if (input.ownerId && input.ownerId !== server.ownerId) {
+    const ownerExists = await db()
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.id, input.ownerId))
+      .limit(1);
+    if (ownerExists[0]) {
+      updateData.ownerId = input.ownerId;
+    }
+  }
+
+  const [updated] = await db()
+    .update(schema.servers)
+    .set(updateData)
+    .where(eq(schema.servers.id, server.id))
+    .returning();
+
+  await applyServer(updated);
+  revalidatePath(`/servers/${serverId}`);
+  revalidatePath(`/servers/${serverId}/settings`);
+  revalidatePath("/servers");
+  return {};
+}
+
+/** Mise à jour des paramètres d'Egg (Image Docker, commande startup, variables). */
+export async function updateServerEggSettings(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  const server = await requirePrivileged(user, serverId);
+
+  const image = String(formData.get("image") ?? "").trim();
+  const startup = String(formData.get("startup") ?? "").trim();
+
+  if (!image) return { error: "L'image Docker ne peut pas être vide." };
+
+  let currentEnv: Record<string, string> = { ...server.env };
+
+  // Si le serveur est rattaché à un egg, on peut traiter les variables préfixées par `var_`
+  if (server.eggId) {
+    const [egg] = await db()
+      .select()
+      .from(schema.eggs)
+      .where(eq(schema.eggs.id, server.eggId))
+      .limit(1);
+
+    if (egg) {
+      const submitted: Record<string, string> = {};
+      for (const v of egg.variables) {
+        const raw = formData.get(`var_${v.envVariable}`);
+        if (typeof raw === "string") submitted[v.envVariable] = raw.trim();
+      }
+      currentEnv = resolveEnv(
+        egg.variables,
+        submitted,
+        builtinVars({ memoryMi: server.memoryMi, containerPort: server.containerPort }),
+      );
+    }
+  }
+
+  const [updated] = await db()
+    .update(schema.servers)
+    .set({
+      image,
+      startup: startup || server.startup,
+      env: currentEnv,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.servers.id, server.id))
+    .returning();
+
+  await applyServer(updated);
+  revalidatePath(`/servers/${serverId}`);
+  revalidatePath(`/servers/${serverId}/settings/egg`);
+  return {};
+}
+
+/** Migration du serveur vers un nœud Kubernetes spécifique. */
+export async function migrateServerAction(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  const server = await requirePrivileged(user, serverId);
+
+  const targetNode = String(formData.get("nodeName") ?? "").trim();
+  const nodeName = targetNode === "" || targetNode === "auto" ? null : targetNode;
+
+  const [updated] = await db()
+    .update(schema.servers)
+    .set({ nodeName, updatedAt: new Date() })
+    .where(eq(schema.servers.id, server.id))
+    .returning();
+
+  await applyServer(updated);
+
+  // Forcer le redémarrage du pod si le serveur est en cours d'exécution pour déplacer le conteneur
+  if (server.desiredState === "running") {
+    await forceDeletePod(server.slug);
+  }
+
+  revalidatePath(`/servers/${serverId}`);
+  revalidatePath(`/servers/${serverId}/settings/management`);
+  return {};
+}
+
+/** Réinstallation du serveur : suppression du marqueur d'install et relance de l'initContainer. */
+export async function reinstallServerAction(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  const server = await requirePrivileged(user, serverId);
+
+  // Tentative de nettoyage du fichier marqueur d'installation via l'agent
+  try {
+    const { resolveVolumeDir, agentFetch } = await import("./files");
+    const vol = await resolveVolumeDir(server.slug);
+    if (vol) {
+      await agentFetch("/api/files/delete", vol, ".lossnear-installed", {
+        method: "POST",
+      }).catch(() => null);
+    }
+  } catch {
+    // Ignorer si le volume n'existe pas encore
+  }
+
+  // Redémarrer / Forcer la suppression du pod pour relancer l'initContainer au prochain boot
+  if (server.desiredState === "running") {
+    await forceDeletePod(server.slug);
+  }
+
+  revalidatePath(`/servers/${serverId}`);
+  revalidatePath(`/servers/${serverId}/settings/management`);
+  return {};
+}
+
 // ---- Membres d'un serveur (sous-utilisateurs) ----
 
 /** Invite un membre par nom d'utilisateur (permissions par défaut). */

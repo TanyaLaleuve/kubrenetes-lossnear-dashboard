@@ -126,10 +126,8 @@ function buildStatefulSet(server: Server): V1StatefulSet {
       template: {
         metadata: { labels: labels(server) },
         spec: {
-          // Arrêt : laisse le temps d'une sauvegarde propre, mais pas trop
-          // (l'image Minecraft ignore SIGTERM pendant la génération du monde).
-          // Pour un arrêt instantané, utiliser Kill (grace period 0).
           terminationGracePeriodSeconds: 30,
+          ...(server.nodeName ? { nodeName: server.nodeName } : {}),
           ...(installContainer ? { initContainers: [installContainer] } : {}),
           containers: [buildMainContainer(server)],
         },
@@ -194,13 +192,23 @@ export async function applyServer(server: Server): Promise<void> {
 
   const replicas = server.desiredState === "running" ? 1 : 0;
   try {
-    await apps.readNamespacedStatefulSet({
+    const existing = await apps.readNamespacedStatefulSet({
       namespace: SERVERS_NAMESPACE,
       name: server.slug,
     });
-    // StatefulSet déjà présent : on ne touche qu'au nombre de replicas via le
-    // sous-objet scale (fiable et sans conflit), pas de remplacement complet.
-    await setReplicas(server.slug, replicas);
+    // Mise à jour de la spec du StatefulSet pour refléter toute modification de config (RAM, CPU, Image, Node, Env)
+    const updatedBody = buildStatefulSet(server);
+    if (existing.metadata?.resourceVersion) {
+      updatedBody.metadata = {
+        ...updatedBody.metadata,
+        resourceVersion: existing.metadata.resourceVersion,
+      };
+    }
+    await apps.replaceNamespacedStatefulSet({
+      namespace: SERVERS_NAMESPACE,
+      name: server.slug,
+      body: updatedBody,
+    });
   } catch (error) {
     if (!(await isNotFound(error))) throw error;
     await apps.createNamespacedStatefulSet({

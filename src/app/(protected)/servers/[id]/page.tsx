@@ -182,13 +182,13 @@ export default async function ServerDetailPage({
           </Link>
         )}
         {privileged && (
-          <span
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground/50"
-            title="Bientôt"
+          <Link
+            href={`/servers/${server.id}/settings`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
           >
             <Settings className="size-4" aria-hidden />
             Paramètres
-          </span>
+          </Link>
         )}
         {privileged && (
           <div className="ml-auto">
