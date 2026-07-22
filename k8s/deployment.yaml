@@ -27,7 +27,7 @@ spec:
       containers:
         - name: dashboard
           image: ghcr.io/tanyalaleuve/kubrenetes-lossnear-dashboard:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 3000

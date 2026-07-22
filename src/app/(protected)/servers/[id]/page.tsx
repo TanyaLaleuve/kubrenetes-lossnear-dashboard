@@ -181,15 +181,13 @@ export default async function ServerDetailPage({
             Permissions
           </Link>
         )}
-        {privileged && (
-          <Link
-            href={`/servers/${server.id}/settings`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-          >
-            <Settings className="size-4" aria-hidden />
-            Paramètres
-          </Link>
-        )}
+        <Link
+          href={`/servers/${server.id}/settings`}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-medium text-accent transition-colors duration-150 hover:bg-accent/20"
+        >
+          <Settings className="size-4" aria-hidden />
+          Paramètres
+        </Link>
         {privileged && (
           <div className="ml-auto">
             <ConfirmButton
