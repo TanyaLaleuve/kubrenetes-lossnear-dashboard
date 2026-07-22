@@ -2,12 +2,14 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { StatusBadge } from "@/components/StatusBadge";
 import { listAllPods, listNamespaces } from "@/lib/k8s/resources";
 import { formatAge } from "@/lib/k8s/format";
+import { requireView } from "@/lib/auth/user";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Namespaces" };
 
 export default async function NamespacesPage() {
+  await requireView("view.namespaces");
   const [namespaces, pods] = await Promise.all([listNamespaces(), listAllPods()]);
 
   const podCount = new Map<string, number>();

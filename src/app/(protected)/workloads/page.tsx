@@ -3,12 +3,14 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { DeploymentList } from "@/components/DeploymentList";
 import { listAllDeployments } from "@/lib/k8s/resources";
 import { isSystemNamespace } from "@/lib/k8s/namespaces";
+import { requireView } from "@/lib/auth/user";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Workloads" };
 
 export default async function WorkloadsPage() {
+  await requireView("view.workloads");
   const deployments = await listAllDeployments();
   const appDeployments = deployments.filter(
     (d) => !isSystemNamespace(d.metadata?.namespace),

@@ -3,7 +3,7 @@ import { eq, inArray, or } from "drizzle-orm";
 import { Plus } from "lucide-react";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { StatusBadge } from "@/components/StatusBadge";
-import { currentUser } from "@/lib/auth/user";
+import { requireView } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 import { serverRuntimeStatus } from "@/lib/servers/k8s";
 import { formatAge } from "@/lib/k8s/format";
@@ -25,7 +25,7 @@ export default async function ServersPage({
 }: {
   searchParams: Promise<{ sort?: string }>;
 }) {
-  const user = await currentUser();
+  const user = await requireView("view.servers");
   const { sort: sortParam } = await searchParams;
   const sort = SORTS.some((s) => s.key === sortParam) ? sortParam : "name";
 

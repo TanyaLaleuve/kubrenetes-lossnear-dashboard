@@ -45,6 +45,11 @@ export const users = pgTable(
     isAdmin: boolean("is_admin").notNull().default(false),
     /** Droit de créer des serveurs custom (accordé par un admin). */
     canCreateServers: boolean("can_create_servers").notNull().default(false),
+    /**
+     * Permissions d'accès aux sections du dashboard (voir
+     * lib/auth/dashboard-permissions.ts). Les admins ont tout d'office.
+     */
+    permissions: text("permissions").array().notNull().default([]),
     quotaMaxServers: integer("quota_max_servers").notNull().default(1),
     quotaMemoryMi: integer("quota_memory_mi").notNull().default(4096),
     quotaCpuMilli: integer("quota_cpu_milli").notNull().default(2000),

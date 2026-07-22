@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import { CreateUserForm } from "@/components/CreateUserForm";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UserGrantsForm } from "@/components/UserGrantsForm";
+import { UserPermissionsForm } from "@/components/UserPermissionsForm";
 import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 
@@ -23,6 +24,7 @@ export default async function AdminUsersPage() {
       origin: schema.users.origin,
       isAdmin: schema.users.isAdmin,
       canCreateServers: schema.users.canCreateServers,
+      permissions: schema.users.permissions,
       quotaMaxServers: schema.users.quotaMaxServers,
       quotaMemoryMi: schema.users.quotaMemoryMi,
       quotaCpuMilli: schema.users.quotaCpuMilli,
@@ -76,8 +78,15 @@ export default async function AdminUsersPage() {
               </div>
             </div>
             {user.id !== admin.id ? (
-              <div className="mt-4">
+              <div className="mt-4 space-y-4">
                 <UserGrantsForm user={user} />
+                <div className="border-t border-border pt-4">
+                  <UserPermissionsForm
+                    userId={user.id}
+                    permissions={user.permissions}
+                    isAdmin={user.isAdmin}
+                  />
+                </div>
               </div>
             ) : (
               <p className="mt-3 text-xs text-muted-foreground">

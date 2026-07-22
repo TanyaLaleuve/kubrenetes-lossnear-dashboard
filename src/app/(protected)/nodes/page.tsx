@@ -8,12 +8,14 @@ import {
   parseCpu,
   parseMemory,
 } from "@/lib/k8s/format";
+import { requireView } from "@/lib/auth/user";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Nœuds" };
 
 export default async function NodesPage() {
+  await requireView("view.nodes");
   const [nodes, metrics] = await Promise.all([
     listNodes(),
     nodeMetrics().catch(() => []),

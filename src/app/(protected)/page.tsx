@@ -19,10 +19,12 @@ import {
   parseMemory,
   podStatus,
 } from "@/lib/k8s/format";
+import { requireView } from "@/lib/auth/user";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
+  await requireView("view.overview");
   const [nodes, pods, deployments, metrics, events] = await Promise.all([
     listNodes(),
     listAllPods(),

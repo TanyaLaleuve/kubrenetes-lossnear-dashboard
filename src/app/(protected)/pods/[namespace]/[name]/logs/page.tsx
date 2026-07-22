@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, RotateCw } from "lucide-react";
 import { coreApi } from "@/lib/k8s/client";
 import { getPodLogs } from "@/lib/k8s/resources";
+import { requireView } from "@/lib/auth/user";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export default async function PodLogsPage({
   params: Promise<{ namespace: string; name: string }>;
   searchParams: Promise<{ container?: string }>;
 }) {
+  await requireView("view.pods");
   const { namespace, name } = await params;
   const { container } = await searchParams;
 

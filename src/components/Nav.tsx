@@ -23,14 +23,15 @@ type NavUser = {
   hasAvatar: boolean;
   avatarVersion: number;
   isAdmin: boolean;
+  permissions: string[];
 };
 
 const mainLinks = [
-  { href: "/", label: "Vue d'ensemble", icon: LayoutDashboard },
-  { href: "/servers", label: "Serveurs", icon: Gamepad2 },
-  { href: "/pods", label: "Pods", icon: Boxes },
-  { href: "/workloads", label: "Workloads", icon: SquareStack },
-  { href: "/system", label: "Système", icon: Cog },
+  { href: "/", label: "Vue d'ensemble", icon: LayoutDashboard, perm: "view.overview" },
+  { href: "/servers", label: "Serveurs", icon: Gamepad2, perm: "view.servers" },
+  { href: "/pods", label: "Pods", icon: Boxes, perm: "view.pods" },
+  { href: "/workloads", label: "Workloads", icon: SquareStack, perm: "view.workloads" },
+  { href: "/system", label: "Système", icon: Cog, perm: "view.system" },
 ];
 
 /* Nav mobile limitée à 5 entrées : Workloads reste accessible via la sidebar
@@ -38,8 +39,8 @@ const mainLinks = [
 const mobileLinks = mainLinks.filter((l) => l.href !== "/workloads");
 
 const clusterLinks = [
-  { href: "/nodes", label: "Nœuds", icon: Server },
-  { href: "/namespaces", label: "Namespaces", icon: Layers },
+  { href: "/nodes", label: "Nœuds", icon: Server, perm: "view.nodes" },
+  { href: "/namespaces", label: "Namespaces", icon: Layers, perm: "view.namespaces" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -75,6 +76,12 @@ function SidebarLink({
 export function Nav({ user }: { user: NavUser }) {
   const pathname = usePathname();
 
+  const canSee = (perm: string) =>
+    user.isAdmin || user.permissions.includes(perm);
+  const visibleMain = mainLinks.filter((l) => canSee(l.perm));
+  const visibleMobile = mobileLinks.filter((l) => canSee(l.perm));
+  const visibleCluster = clusterLinks.filter((l) => canSee(l.perm));
+
   return (
     <>
       {/* Sidebar desktop */}
@@ -84,17 +91,19 @@ export function Nav({ user }: { user: NavUser }) {
           <span className="font-mono text-sm font-semibold">lossnear/k8s</span>
         </div>
         <nav className="flex-1 space-y-1 p-3" aria-label="Navigation principale">
-          {mainLinks.map((link) => (
+          {visibleMain.map((link) => (
             <SidebarLink
               key={link.href}
               {...link}
               active={isActive(pathname, link.href)}
             />
           ))}
-          <p className="px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Cluster
-          </p>
-          {clusterLinks.map((link) => (
+          {visibleCluster.length > 0 && (
+            <p className="px-3 pt-4 pb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+              Cluster
+            </p>
+          )}
+          {visibleCluster.map((link) => (
             <SidebarLink
               key={link.href}
               {...link}
@@ -156,7 +165,7 @@ export function Nav({ user }: { user: NavUser }) {
         aria-label="Navigation principale"
         className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
       >
-        {mobileLinks.map(({ href, label, icon: Icon }) => (
+        {visibleMobile.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

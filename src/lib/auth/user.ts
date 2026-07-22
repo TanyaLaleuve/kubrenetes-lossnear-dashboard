@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db, schema } from "@/lib/db";
 import { getSession } from "./session";
+import { canAccess, landingPath } from "./dashboard-permissions";
 
 export type SafeUser = {
   id: string;
@@ -13,6 +14,8 @@ export type SafeUser = {
   discordId: string | null;
   isAdmin: boolean;
   canCreateServers: boolean;
+  /** Sections du dashboard autorisées (voir dashboard-permissions.ts). */
+  permissions: string[];
   quotaMaxServers: number;
   quotaMemoryMi: number;
   quotaCpuMilli: number;
@@ -36,6 +39,7 @@ export async function sessionUser(): Promise<SafeUser | null> {
       discordId: schema.users.discordId,
       isAdmin: schema.users.isAdmin,
       canCreateServers: schema.users.canCreateServers,
+      permissions: schema.users.permissions,
       quotaMaxServers: schema.users.quotaMaxServers,
       quotaMemoryMi: schema.users.quotaMemoryMi,
       quotaCpuMilli: schema.users.quotaCpuMilli,
@@ -57,6 +61,7 @@ export async function sessionUser(): Promise<SafeUser | null> {
     discordId: user.discordId,
     isAdmin: user.isAdmin,
     canCreateServers: user.canCreateServers,
+    permissions: user.permissions ?? [],
     quotaMaxServers: user.quotaMaxServers,
     quotaMemoryMi: user.quotaMemoryMi,
     quotaCpuMilli: user.quotaCpuMilli,
@@ -70,6 +75,19 @@ export async function currentUser(): Promise<SafeUser> {
   const user = await sessionUser();
   if (!user) {
     redirect("/login");
+  }
+  return user;
+}
+
+/**
+ * Exige l'accès à une section du dashboard. Redirige vers la page
+ * d'atterrissage autorisée si l'utilisateur n'a pas la permission.
+ * Les admins passent toujours.
+ */
+export async function requireView(perm: string): Promise<SafeUser> {
+  const user = await currentUser();
+  if (!canAccess(user, perm)) {
+    redirect(landingPath(user));
   }
   return user;
 }

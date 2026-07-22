@@ -4,7 +4,7 @@ import { ArrowLeft, Boxes, Egg as EggIcon, Rocket } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ServerCreateForm } from "@/components/ServerCreateForm";
 import { EggServerForm } from "@/components/EggServerForm";
-import { currentUser } from "@/lib/auth/user";
+import { requireView } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export default async function NewServerPage({
 }: {
   searchParams: Promise<{ egg?: string; mode?: string }>;
 }) {
-  const user = await currentUser();
+  const user = await requireView("view.servers");
   if (!user.canCreateServers && !user.isAdmin) {
     redirect("/servers");
   }

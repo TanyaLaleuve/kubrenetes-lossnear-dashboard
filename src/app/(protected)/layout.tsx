@@ -17,6 +17,7 @@ export default async function ProtectedLayout({
           hasAvatar: user.hasAvatar,
           avatarVersion: user.updatedAt,
           isAdmin: user.isAdmin,
+          permissions: user.permissions,
         }}
       />
       <main className="px-4 pb-24 pt-6 md:ml-56 md:px-8 md:pb-10">

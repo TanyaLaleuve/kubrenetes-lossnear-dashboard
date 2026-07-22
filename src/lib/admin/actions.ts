@@ -1,10 +1,15 @@
 "use server";
 
 import { hash } from "bcryptjs";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
+import {
+  DEFAULT_DASHBOARD_PERMISSIONS,
+  sanitizeDashboardPermissions,
+} from "@/lib/auth/dashboard-permissions";
 
 export type AdminFormState = { error?: string; success?: string };
 
@@ -72,6 +77,7 @@ export async function createUser(
         origin: "k8s",
         isAdmin: input.isAdmin,
         canCreateServers: input.canCreateServers,
+        permissions: sanitizeDashboardPermissions(DEFAULT_DASHBOARD_PERMISSIONS),
         quotaMaxServers: input.quotaMaxServers,
         quotaMemoryMi: input.quotaMemoryMi,
         quotaCpuMilli: input.quotaCpuMilli,
@@ -86,4 +92,31 @@ export async function createUser(
 
   revalidatePath("/admin/users");
   return { success: `Compte « ${input.username} » créé.` };
+}
+
+/** Met à jour les permissions d'accès au dashboard d'un utilisateur. */
+export async function updateUserPermissions(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const admin = await currentUser();
+  if (!admin.isAdmin) return { error: "Réservé aux admins." };
+
+  const userId = String(formData.get("userId") ?? "");
+  if (!z.string().uuid().safeParse(userId).success) {
+    return { error: "Utilisateur invalide." };
+  }
+
+  // Les cases cochées arrivent comme entrées "perm" multiples.
+  const permissions = sanitizeDashboardPermissions(
+    formData.getAll("perm").map(String),
+  );
+
+  await db()
+    .update(schema.users)
+    .set({ permissions, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId));
+
+  revalidatePath("/admin/users");
+  return { success: "Permissions mises à jour." };
 }

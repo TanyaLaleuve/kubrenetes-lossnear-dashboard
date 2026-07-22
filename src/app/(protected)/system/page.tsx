@@ -3,12 +3,14 @@ import { DeploymentList } from "@/components/DeploymentList";
 import { PodList } from "@/components/PodList";
 import { listAllDeployments, listAllPods } from "@/lib/k8s/resources";
 import { isSystemNamespace } from "@/lib/k8s/namespaces";
+import { requireView } from "@/lib/auth/user";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Système" };
 
 export default async function SystemPage() {
+  await requireView("view.system");
   const [pods, deployments] = await Promise.all([
     listAllPods(),
     listAllDeployments(),
