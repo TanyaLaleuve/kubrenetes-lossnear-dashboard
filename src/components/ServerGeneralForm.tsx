@@ -13,6 +13,8 @@ type UserItem = {
 export function ServerGeneralForm({
   server,
   users,
+  ownerUsername,
+  canEdit,
   isPrivileged,
   canChoosePort,
   portMin,
@@ -20,7 +22,13 @@ export function ServerGeneralForm({
   portsLabel,
 }: {
   server: ServerType;
+  /** Liste complète des comptes — vide si !isPrivileged (pas envoyée au client). */
   users: UserItem[];
+  /** Nom du propriétaire actuel, pour l'affichage en lecture seule. */
+  ownerUsername: string;
+  /** Peut modifier nom/ressources/ports/adresse (settings.general ou privilégié). */
+  canEdit: boolean;
+  /** Propriétaire/admin uniquement : seul habilité à changer le propriétaire. */
   isPrivileged: boolean;
   canChoosePort: boolean;
   portMin: number;
@@ -61,7 +69,7 @@ export function ServerGeneralForm({
             type="text"
             required
             defaultValue={server.name}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           />
         </div>
@@ -71,19 +79,24 @@ export function ServerGeneralForm({
           <label htmlFor="ownerId" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             <User className="size-3.5" /> Propriétaire
           </label>
-          <select
-            id="ownerId"
-            name="ownerId"
-            defaultValue={server.ownerId}
-            disabled={!isPrivileged}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
-          >
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.username} {u.id === server.ownerId ? "(Actuel)" : ""}
-              </option>
-            ))}
-          </select>
+          {isPrivileged ? (
+            <select
+              id="ownerId"
+              name="ownerId"
+              defaultValue={server.ownerId}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+            >
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.username} {u.id === server.ownerId ? "(Actuel)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+              {ownerUsername}
+            </p>
+          )}
         </div>
 
         {/* RAM (Mio) */}
@@ -100,7 +113,7 @@ export function ServerGeneralForm({
             step={256}
             required
             defaultValue={server.memoryMi}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           />
           <p className="text-[11px] text-muted-foreground">Ex: 1024 = 1 Go, 2048 = 2 Go, 4096 = 4 Go</p>
@@ -120,7 +133,7 @@ export function ServerGeneralForm({
             step={250}
             required
             defaultValue={server.cpuMilli}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           />
           <p className="text-[11px] text-muted-foreground">Ex: 1000 = 1 vCPU, 2000 = 2 vCPU</p>
@@ -162,7 +175,7 @@ export function ServerGeneralForm({
             required
             defaultValue={server.hostPort}
             readOnly={!canChoosePort}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground read-only:opacity-60 focus:border-accent focus:outline-none disabled:opacity-50"
           />
           <p className="text-[11px] text-muted-foreground">
@@ -185,7 +198,7 @@ export function ServerGeneralForm({
             max={65535}
             required
             defaultValue={server.containerPort}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           />
           <p className="text-[11px] text-muted-foreground">Port interne (Minecraft = 25565)</p>
@@ -203,13 +216,13 @@ export function ServerGeneralForm({
             placeholder="play.example.com"
             data-keep-empty
             defaultValue={server.displayAddress ?? ""}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           />
         </div>
       </div>
 
-      {isPrivileged && (
+      {canEdit && (
         <div className="flex justify-end pt-2">
           <button
             type="submit"

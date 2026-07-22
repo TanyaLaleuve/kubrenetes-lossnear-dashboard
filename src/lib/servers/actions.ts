@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
-import { requirePrivileged, requireServerPermission } from "./authz";
+import { requirePrivileged, requireServerPermission, serverAccess } from "./authz";
 import { DEFAULT_IMAGE } from "./constants";
 import { DEFAULT_MEMBER_PERMISSIONS, sanitizePermissions } from "./permissions";
 import { builtinVars, EGG_MOUNT_PATH, resolveEnv } from "./eggs";
@@ -375,35 +375,6 @@ export async function updateServerAddress(
   return {};
 }
 
-/** Transfert de propriété — owner actuel ou admin. */
-export async function transferServer(
-  _prev: ServerFormState,
-  formData: FormData,
-): Promise<ServerFormState> {
-  const user = await currentUser();
-  const id = String(formData.get("serverId") ?? "");
-  const newOwnerId = String(formData.get("newOwnerId") ?? "");
-  const server = await requirePrivileged(user, id);
-
-  if (!z.string().uuid().safeParse(newOwnerId).success) {
-    return { error: "Utilisateur invalide." };
-  }
-  const target = await db()
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(eq(schema.users.id, newOwnerId))
-    .limit(1);
-  if (!target[0]) return { error: "Utilisateur introuvable." };
-
-  await db()
-    .update(schema.servers)
-    .set({ ownerId: newOwnerId, updatedAt: new Date() })
-    .where(eq(schema.servers.id, server.id));
-  revalidatePath(`/servers/${id}`);
-  revalidatePath("/servers");
-  return {};
-}
-
 const generalSettingsSchema = z.object({
   serverId: z.string().uuid(),
   name: z.string().trim().min(3, "Nom : 3 caractères minimum").max(48),
@@ -426,7 +397,11 @@ export async function updateServerGeneralSettings(
 ): Promise<ServerFormState> {
   const user = await currentUser();
   const serverId = String(formData.get("serverId") ?? "");
-  const server = await requirePrivileged(user, serverId);
+  const access = await serverAccess(user, serverId);
+  if (!access || !(access.privileged || access.permissions.has("settings.general"))) {
+    return { error: "Accès refusé" };
+  }
+  const server = access.server;
 
   const parsed = generalSettingsSchema.safeParse({
     serverId,
@@ -482,7 +457,10 @@ export async function updateServerGeneralSettings(
     updatedAt: new Date(),
   };
 
-  if (input.ownerId && input.ownerId !== server.ownerId) {
+  // Changer de propriétaire reste réservé au propriétaire actuel/admin, même
+  // avec settings.general (donner un serveur à quelqu'un d'autre est plus
+  // sensible qu'ajuster ses ressources).
+  if (access.privileged && input.ownerId && input.ownerId !== server.ownerId) {
     const ownerExists = await db()
       .select({ id: schema.users.id })
       .from(schema.users)
@@ -513,7 +491,7 @@ export async function updateServerEggSettings(
 ): Promise<ServerFormState> {
   const user = await currentUser();
   const serverId = String(formData.get("serverId") ?? "");
-  const server = await requirePrivileged(user, serverId);
+  const server = await requireServerPermission(user, serverId, "settings.egg");
 
   const image = String(formData.get("image") ?? "").trim();
   const startup = String(formData.get("startup") ?? "").trim();
@@ -568,7 +546,7 @@ export async function migrateServerAction(
 ): Promise<ServerFormState> {
   const user = await currentUser();
   const serverId = String(formData.get("serverId") ?? "");
-  const server = await requirePrivileged(user, serverId);
+  const server = await requireServerPermission(user, serverId, "settings.manage");
 
   const targetNode = String(formData.get("nodeName") ?? "").trim();
   const nodeName = targetNode === "" || targetNode === "auto" ? null : targetNode;
@@ -599,7 +577,7 @@ export async function reinstallServerAction(
 ): Promise<ServerFormState> {
   const user = await currentUser();
   const serverId = String(formData.get("serverId") ?? "");
-  const server = await requirePrivileged(user, serverId);
+  const server = await requireServerPermission(user, serverId, "settings.manage");
 
   // Tentative de nettoyage du fichier marqueur d'installation via l'agent
   try {

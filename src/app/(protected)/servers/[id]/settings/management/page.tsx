@@ -17,7 +17,9 @@ export default async function ServerSettingsManagementPage({
   const user = await currentUser();
 
   const access = await serverAccess(user, id);
-  if (!access) redirect("/servers");
+  const canManage =
+    !!access && (access.privileged || access.permissions.has("settings.manage"));
+  if (!access || !canManage) redirect(`/servers/${id}`);
 
   const nodesList = await listNodes().catch(() => []);
   const nodes = nodesList.map((n) => ({
@@ -33,6 +35,7 @@ export default async function ServerSettingsManagementPage({
       <ServerManagementForm
         server={access.server}
         nodes={nodes}
+        canManage={canManage}
         isPrivileged={access.privileged}
       />
     </div>

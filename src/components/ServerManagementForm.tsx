@@ -19,10 +19,14 @@ type NodeOption = {
 export function ServerManagementForm({
   server,
   nodes,
+  canManage,
   isPrivileged,
 }: {
   server: ServerType;
   nodes: NodeOption[];
+  /** Peut réinstaller/migrer (settings.manage ou privilégié). */
+  canManage: boolean;
+  /** Propriétaire/admin uniquement : seul habilité à supprimer le serveur. */
   isPrivileged: boolean;
 }) {
   const [reinstallState, reinstallAction, reinstallPending] = useActionState<
@@ -62,7 +66,7 @@ export function ServerManagementForm({
               : "Aucun script d'installation spécifique, le conteneur sera simplement redémarré à neuf."}
           </div>
 
-          {isPrivileged && (
+          {canManage && (
             <button
               type="submit"
               disabled={reinstallPending}
@@ -108,7 +112,7 @@ export function ServerManagementForm({
               id="nodeName"
               name="nodeName"
               defaultValue={server.nodeName ?? "auto"}
-              disabled={!isPrivileged}
+              disabled={!canManage}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
             >
               <option value="auto">Assignation automatique par le Scheduler K8s (Default)</option>
@@ -123,7 +127,7 @@ export function ServerManagementForm({
             </p>
           </div>
 
-          {isPrivileged && (
+          {canManage && (
             <div className="flex justify-end">
               <button
                 type="submit"

@@ -1,4 +1,4 @@
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { ServerGeneralForm } from "@/components/ServerGeneralForm";
 import { currentUser } from "@/lib/auth/user";
@@ -20,12 +20,24 @@ export default async function ServerSettingsGeneralPage({
   const user = await currentUser();
 
   const access = await serverAccess(user, id);
-  if (!access) redirect("/servers");
+  const canEdit =
+    !!access && (access.privileged || access.permissions.has("settings.general"));
+  if (!access || !canEdit) redirect(`/servers/${id}`);
 
-  const usersList = await db()
-    .select({ id: schema.users.id, username: schema.users.username })
+  // Liste complète des comptes (pour le sélecteur propriétaire) : uniquement
+  // envoyée au client si privilégié, pour ne pas exposer tous les usernames
+  // à un membre qui n'a que settings.general.
+  const usersList = access.privileged
+    ? await db()
+        .select({ id: schema.users.id, username: schema.users.username })
+        .from(schema.users)
+        .orderBy(asc(schema.users.username))
+    : [];
+  const ownerRow = await db()
+    .select({ username: schema.users.username })
     .from(schema.users)
-    .orderBy(asc(schema.users.username));
+    .where(eq(schema.users.id, access.server.ownerId))
+    .limit(1);
 
   const bounds = userPortBounds(user);
 
@@ -34,6 +46,8 @@ export default async function ServerSettingsGeneralPage({
       <ServerGeneralForm
         server={access.server}
         users={usersList}
+        ownerUsername={ownerRow[0]?.username ?? "?"}
+        canEdit={canEdit}
         isPrivileged={access.privileged}
         canChoosePort={canChoosePort(user)}
         portMin={bounds.min}

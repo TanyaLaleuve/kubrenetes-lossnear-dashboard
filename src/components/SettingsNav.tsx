@@ -4,7 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Egg, HardDrive, Shield, Sliders } from "lucide-react";
 
-export function SettingsNav({ serverId }: { serverId: string }) {
+export function SettingsNav({
+  serverId,
+  tabs: allowed,
+}: {
+  serverId: string;
+  tabs: { general: boolean; permissions: boolean; egg: boolean; management: boolean };
+}) {
   const pathname = usePathname();
 
   const tabs = [
@@ -13,26 +19,30 @@ export function SettingsNav({ serverId }: { serverId: string }) {
       exact: true,
       label: "Général",
       icon: Sliders,
+      show: allowed.general,
     },
     {
       href: `/servers/${serverId}/settings/permissions`,
       exact: false,
       label: "Permissions",
       icon: Shield,
+      show: allowed.permissions,
     },
     {
       href: `/servers/${serverId}/settings/egg`,
       exact: false,
       label: "Egg / Conteneur",
       icon: Egg,
+      show: allowed.egg,
     },
     {
       href: `/servers/${serverId}/settings/management`,
       exact: false,
       label: "Gestion & Migration",
       icon: HardDrive,
+      show: allowed.management,
     },
-  ];
+  ].filter((t) => t.show);
 
   return (
     <nav className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-1.5" aria-label="Navigation Paramètres">

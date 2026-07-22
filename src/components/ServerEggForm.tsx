@@ -9,11 +9,11 @@ import { builtinVars, substituteVars } from "@/lib/servers/eggs";
 export function ServerEggForm({
   server,
   egg,
-  isPrivileged,
+  canEdit,
 }: {
   server: ServerType;
   egg: EggType | null;
-  isPrivileged: boolean;
+  canEdit: boolean;
 }) {
   const [state, formAction, pending] = useActionState<ServerFormState, FormData>(
     updateServerEggSettings,
@@ -68,7 +68,7 @@ export function ServerEggForm({
             name="image"
             value={selectedImage}
             onChange={(e) => setSelectedImage(e.target.value)}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           >
             {Object.entries(egg.dockerImages).map(([label, img]) => (
@@ -85,7 +85,7 @@ export function ServerEggForm({
             required
             value={selectedImage}
             onChange={(e) => setSelectedImage(e.target.value)}
-            disabled={!isPrivileged}
+            disabled={!canEdit}
             placeholder="itzg/minecraft-server:latest"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           />
@@ -103,7 +103,7 @@ export function ServerEggForm({
           rows={3}
           value={startup}
           onChange={(e) => setStartup(e.target.value)}
-          disabled={!isPrivileged}
+          disabled={!canEdit}
           className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
         />
         {startup && (
@@ -141,7 +141,7 @@ export function ServerEggForm({
                       name={`var_${v.envVariable}`}
                       type="text"
                       defaultValue={currentValue}
-                      disabled={!v.userEditable || !isPrivileged}
+                      disabled={!v.userEditable || !canEdit}
                       className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
                     />
                     {v.description && (
@@ -154,7 +154,7 @@ export function ServerEggForm({
         </div>
       )}
 
-      {isPrivileged && (
+      {canEdit && (
         <div className="flex justify-end pt-2">
           <button
             type="submit"

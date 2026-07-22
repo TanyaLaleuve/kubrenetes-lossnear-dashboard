@@ -20,6 +20,11 @@ export const DASHBOARD_PERMISSION_GROUPS = [
         label: "Choisir le port externe",
         hint: "Sinon le port est attribué automatiquement dans sa plage.",
       },
+      {
+        key: "servers.view_all",
+        label: "Voir tous les serveurs du cluster",
+        hint: "Sinon : uniquement les siens + ceux où il est invité.",
+      },
     ],
   },
   {
@@ -68,6 +73,18 @@ export function canChoosePort(user: {
   permissions: string[];
 }): boolean {
   return canAccess(user, CHOOSE_PORT_PERMISSION);
+}
+
+/**
+ * L'utilisateur peut-il voir tous les serveurs du cluster (pas seulement les
+ * siens + ceux où il est invité) ? Admin = toujours oui ; pour l'instant
+ * personne d'autre ne l'a par défaut, mais la permission reste accordable.
+ */
+export function canViewAllServers(user: {
+  isAdmin: boolean;
+  permissions: string[];
+}): boolean {
+  return canAccess(user, "servers.view_all");
 }
 
 /**

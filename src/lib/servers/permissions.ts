@@ -41,6 +41,18 @@ export const PERMISSION_GROUPS = [
       { key: "members.manage", label: "Gérer les membres et permissions" },
     ],
   },
+  {
+    key: "settings",
+    label: "Paramètres",
+    perms: [
+      {
+        key: "settings.general",
+        label: "Général (nom, ressources, ports, adresse)",
+      },
+      { key: "settings.egg", label: "Egg / Conteneur" },
+      { key: "settings.manage", label: "Gestion (réinstaller, migrer)" },
+    ],
+  },
 ] as const;
 
 export const ALL_PERMISSIONS: Permission[] = PERMISSION_GROUPS.flatMap((g) =>

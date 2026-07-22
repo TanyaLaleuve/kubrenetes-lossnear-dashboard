@@ -19,9 +19,17 @@ export default async function ServerSettingsLayout({
   const { id } = await params;
   const user = await currentUser();
 
-  // Paramètres réservés au propriétaire et aux admins.
   const access = await serverAccess(user, id);
-  if (!access || !access.privileged) {
+  // Section Paramètres accessible si au moins un onglet l'est : propriétaire/
+  // admin, ou une permission settings.*/members.read spécifique. Chaque
+  // sous-page vérifie ensuite sa propre permission.
+  const tabs = {
+    general: !!access && (access.privileged || access.permissions.has("settings.general")),
+    permissions: !!access && (access.privileged || access.permissions.has("members.read")),
+    egg: !!access && (access.privileged || access.permissions.has("settings.egg")),
+    management: !!access && (access.privileged || access.permissions.has("settings.manage")),
+  };
+  if (!access || !Object.values(tabs).some(Boolean)) {
     redirect(`/servers/${id}`);
   }
 
@@ -45,7 +53,7 @@ export default async function ServerSettingsLayout({
         </div>
       </header>
 
-      <SettingsNav serverId={id} />
+      <SettingsNav serverId={id} tabs={tabs} />
 
       <main>{children}</main>
     </div>

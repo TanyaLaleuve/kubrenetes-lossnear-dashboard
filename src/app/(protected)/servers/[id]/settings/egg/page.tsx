@@ -18,7 +18,9 @@ export default async function ServerSettingsEggPage({
   const user = await currentUser();
 
   const access = await serverAccess(user, id);
-  if (!access) redirect("/servers");
+  const canEdit =
+    !!access && (access.privileged || access.permissions.has("settings.egg"));
+  if (!access || !canEdit) redirect(`/servers/${id}`);
 
   let egg = null;
   if (access.server.eggId) {
@@ -32,11 +34,7 @@ export default async function ServerSettingsEggPage({
 
   return (
     <div className="space-y-6">
-      <ServerEggForm
-        server={access.server}
-        egg={egg}
-        isPrivileged={access.privileged}
-      />
+      <ServerEggForm server={access.server} egg={egg} canEdit={canEdit} />
     </div>
   );
 }

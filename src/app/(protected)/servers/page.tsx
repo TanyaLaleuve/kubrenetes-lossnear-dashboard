@@ -3,7 +3,9 @@ import { eq, inArray, or } from "drizzle-orm";
 import { Plus } from "lucide-react";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ServerGrid } from "@/components/ServerGrid";
+import { ViewAllToggle } from "@/components/ViewAllToggle";
 import { requireView } from "@/lib/auth/user";
+import { canViewAllServers } from "@/lib/auth/dashboard-permissions";
 import { db, schema } from "@/lib/db";
 import { serverRuntimeStatus } from "@/lib/servers/k8s";
 import { formatAge } from "@/lib/k8s/format";
@@ -23,15 +25,21 @@ const STATUS_ORDER = { Running: 0, Starting: 1, Stopping: 2, Error: 3, Stopped: 
 export default async function ServersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; all?: string }>;
 }) {
   const user = await requireView("view.servers");
-  const { sort: sortParam } = await searchParams;
+  const { sort: sortParam, all: allParam } = await searchParams;
   const sort = SORTS.some((s) => s.key === sortParam) ? sortParam : "name";
+  const canViewAll = canViewAllServers(user);
+  const showAll = canViewAll && allParam === "1";
+  const sortSuffix = showAll ? "&all=1" : "";
 
-  // Serveurs visibles : les siens + ceux où l'on est invité (admin : tous).
+  // Par défaut, pour tout le monde y compris les admins : uniquement les
+  // serveurs dont on est propriétaire + ceux où l'on est invité. "Tous les
+  // serveurs" est un choix explicite (case à cocher), réservé à qui a la
+  // permission servers.view_all (admin d'office).
   let filter;
-  if (!user.isAdmin) {
+  if (!showAll) {
     const memberships = await db()
       .select({ serverId: schema.serverMembers.serverId })
       .from(schema.serverMembers)
@@ -81,7 +89,7 @@ export default async function ServersPage({
           <h1 className="text-xl font-semibold">Serveurs</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {rows.length} serveur{rows.length > 1 ? "s" : ""}
-            {user.isAdmin ? " (vue admin : tous)" : ""}
+            {showAll ? " (vue globale)" : ""}
           </p>
         </div>
         {canCreate && (
@@ -95,12 +103,14 @@ export default async function ServersPage({
         )}
       </header>
 
+      {canViewAll && <ViewAllToggle checked={showAll} />}
+
       {withStatus.length > 1 && (
         <nav aria-label="Tri" className="flex gap-2">
           {SORTS.map(({ key, label }) => (
             <Link
               key={key}
-              href={`/servers?sort=${key}`}
+              href={`/servers?sort=${key}${sortSuffix}`}
               className={`rounded-full border px-3 py-1 text-xs transition-colors duration-150 ${
                 sort === key
                   ? "border-accent/40 bg-accent/10 text-accent"
