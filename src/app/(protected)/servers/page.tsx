@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { eq, inArray, or } from "drizzle-orm";
 import { Plus } from "lucide-react";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -29,10 +29,23 @@ export default async function ServersPage({
   const { sort: sortParam } = await searchParams;
   const sort = SORTS.some((s) => s.key === sortParam) ? sortParam : "name";
 
-  const rows = await db()
-    .select()
-    .from(schema.servers)
-    .where(user.isAdmin ? undefined : eq(schema.servers.ownerId, user.id));
+  // Serveurs visibles : les siens + ceux où l'on est invité (admin : tous).
+  let filter;
+  if (!user.isAdmin) {
+    const memberships = await db()
+      .select({ serverId: schema.serverMembers.serverId })
+      .from(schema.serverMembers)
+      .where(eq(schema.serverMembers.userId, user.id));
+    const memberIds = memberships.map((m) => m.serverId);
+    filter = memberIds.length
+      ? or(
+          eq(schema.servers.ownerId, user.id),
+          inArray(schema.servers.id, memberIds),
+        )
+      : eq(schema.servers.ownerId, user.id);
+  }
+
+  const rows = await db().select().from(schema.servers).where(filter);
 
   const withStatus = await Promise.all(
     rows.map(async (server) => ({

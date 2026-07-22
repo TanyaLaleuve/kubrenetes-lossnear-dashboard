@@ -1,5 +1,5 @@
 import { compare } from "bcryptjs";
-import { eq, or, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
@@ -51,8 +51,26 @@ export async function POST(request: Request) {
     .where(eq(schema.servers.id, serverId))
     .limit(1);
   const server = servers[0];
-  if (!server || (server.ownerId !== user.id && !user.isAdmin)) {
+  if (!server) {
     return NextResponse.json({ ok: false }, { status: 403 });
+  }
+
+  // Accès SFTP : propriétaire, admin, ou membre avec la permission files.sftp.
+  const privileged = user.isAdmin || server.ownerId === user.id;
+  if (!privileged) {
+    const member = await db()
+      .select({ permissions: schema.serverMembers.permissions })
+      .from(schema.serverMembers)
+      .where(
+        and(
+          eq(schema.serverMembers.serverId, serverId),
+          eq(schema.serverMembers.userId, user.id),
+        ),
+      )
+      .limit(1);
+    if (!member[0]?.permissions.includes("files.sftp")) {
+      return NextResponse.json({ ok: false }, { status: 403 });
+    }
   }
 
   const vol = await resolveVolumeDir(server.slug);

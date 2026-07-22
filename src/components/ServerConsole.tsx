@@ -14,9 +14,11 @@ const MAX_LINES = 500;
 export function ServerConsole({
   serverId,
   running,
+  canCommand = true,
 }: {
   serverId: string;
   running: boolean;
+  canCommand?: boolean;
 }) {
   const [lines, setLines] = useState<string[]>([]);
   const [command, setCommand] = useState("");
@@ -123,30 +125,36 @@ export function ServerConsole({
             ),
           )}
         </div>
-        <form
-          onSubmit={send}
-          className="flex items-center gap-2 border-t border-border p-2"
-        >
-          <span aria-hidden className="pl-1 font-mono text-xs text-accent">
-            &gt;
-          </span>
-          <input
-            value={command}
-            onChange={(event) => setCommand(event.target.value)}
-            disabled={!running}
-            placeholder={running ? "commande (ex. list, say coucou)" : "serveur arrêté"}
-            aria-label="Commande console"
-            className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/50"
-          />
-          <button
-            type="submit"
-            disabled={!running || sending || !command.trim()}
-            aria-label="Envoyer la commande"
-            className="grid size-9 cursor-pointer place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-accent disabled:opacity-40"
+        {canCommand ? (
+          <form
+            onSubmit={send}
+            className="flex items-center gap-2 border-t border-border p-2"
           >
-            <SendHorizontal className="size-4" aria-hidden />
-          </button>
-        </form>
+            <span aria-hidden className="pl-1 font-mono text-xs text-accent">
+              &gt;
+            </span>
+            <input
+              value={command}
+              onChange={(event) => setCommand(event.target.value)}
+              disabled={!running}
+              placeholder={running ? "commande (ex. list, say coucou)" : "serveur arrêté"}
+              aria-label="Commande console"
+              className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/50"
+            />
+            <button
+              type="submit"
+              disabled={!running || sending || !command.trim()}
+              aria-label="Envoyer la commande"
+              className="grid size-9 cursor-pointer place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-accent disabled:opacity-40"
+            >
+              <SendHorizontal className="size-4" aria-hidden />
+            </button>
+          </form>
+        ) : (
+          <p className="border-t border-border p-2 text-center text-xs text-muted-foreground">
+            Lecture seule — pas de permission pour envoyer des commandes.
+          </p>
+        )}
       </div>
       {error && (
         <p role="alert" className="text-sm text-destructive">

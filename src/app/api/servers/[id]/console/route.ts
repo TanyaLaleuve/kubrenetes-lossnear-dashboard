@@ -2,7 +2,7 @@ import { PassThrough } from "node:stream";
 import { Log } from "@kubernetes/client-node";
 import { sessionUser } from "@/lib/auth/user";
 import { coreApi, getKubeConfig } from "@/lib/k8s/client";
-import { loadServerFor } from "@/lib/servers/authz";
+import { requireServerPermission } from "@/lib/servers/authz";
 import { SERVERS_NAMESPACE } from "@/lib/servers/k8s";
 
 /**
@@ -22,9 +22,9 @@ export async function GET(
   const { id } = await params;
   let server;
   try {
-    server = await loadServerFor(user, id);
+    server = await requireServerPermission(user, id, "console.read");
   } catch {
-    return new Response(null, { status: 404 });
+    return new Response(null, { status: 403 });
   }
 
   const podName = `${server.slug}-0`;

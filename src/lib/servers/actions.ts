@@ -6,8 +6,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
-import { loadServerFor } from "./authz";
+import { requirePrivileged, requireServerPermission } from "./authz";
 import { DEFAULT_IMAGE } from "./constants";
+import { sanitizePermissions } from "./permissions";
 import {
   applyServer,
   destroyServer,
@@ -144,9 +145,13 @@ export async function createServer(
   redirect(`/servers/${server.id}`);
 }
 
-async function setDesiredState(id: string, state: "running" | "stopped") {
+async function setDesiredState(
+  id: string,
+  state: "running" | "stopped",
+  permission: string,
+) {
   const user = await currentUser();
-  const server = await loadServerFor(user, id);
+  const server = await requireServerPermission(user, id, permission);
   const [updated] = await db()
     .update(schema.servers)
     .set({ desiredState: state, updatedAt: new Date() })
@@ -158,17 +163,17 @@ async function setDesiredState(id: string, state: "running" | "stopped") {
 }
 
 export async function startServer(id: string) {
-  await setDesiredState(id, "running");
+  await setDesiredState(id, "running", "control.start");
 }
 
 export async function stopServer(id: string) {
-  await setDesiredState(id, "stopped");
+  await setDesiredState(id, "stopped", "control.stop");
 }
 
 /** Arrêt dur immédiat : état arrêté + suppression forcée du pod. */
 export async function killServer(id: string) {
   const user = await currentUser();
-  const server = await loadServerFor(user, id);
+  const server = await requireServerPermission(user, id, "control.kill");
   const [updated] = await db()
     .update(schema.servers)
     .set({ desiredState: "stopped", updatedAt: new Date() })
@@ -182,7 +187,7 @@ export async function killServer(id: string) {
 
 export async function restartServer(id: string) {
   const user = await currentUser();
-  const server = await loadServerFor(user, id);
+  const server = await requireServerPermission(user, id, "control.restart");
   if (server.desiredState !== "running") {
     throw new Error("Le serveur n'est pas démarré.");
   }
@@ -197,7 +202,8 @@ export async function restartServer(id: string) {
 
 export async function deleteServer(id: string) {
   const user = await currentUser();
-  const server = await loadServerFor(user, id);
+  // Action destructive : propriétaire ou admin uniquement.
+  const server = await requirePrivileged(user, id);
   await destroyServer(server);
   await db().delete(schema.servers).where(eq(schema.servers.id, server.id));
   revalidatePath("/servers");
@@ -217,7 +223,7 @@ export async function updateServerAddress(
 ): Promise<ServerFormState> {
   const user = await currentUser();
   const id = String(formData.get("serverId") ?? "");
-  const server = await loadServerFor(user, id);
+  const server = await requirePrivileged(user, id);
 
   const parsed = addressSchema.safeParse(formData.get("displayAddress") ?? "");
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -238,7 +244,7 @@ export async function transferServer(
   const user = await currentUser();
   const id = String(formData.get("serverId") ?? "");
   const newOwnerId = String(formData.get("newOwnerId") ?? "");
-  const server = await loadServerFor(user, id);
+  const server = await requirePrivileged(user, id);
 
   if (!z.string().uuid().safeParse(newOwnerId).success) {
     return { error: "Utilisateur invalide." };
@@ -257,6 +263,84 @@ export async function transferServer(
   revalidatePath(`/servers/${id}`);
   revalidatePath("/servers");
   return {};
+}
+
+// ---- Membres d'un serveur (sous-utilisateurs) ----
+
+/** Invite un membre par nom d'utilisateur (permissions par défaut). */
+export async function addMember(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  const identifier = String(formData.get("username") ?? "").trim();
+
+  const server = await requireServerPermission(user, serverId, "members.manage");
+
+  const rows = await db()
+    .select({ id: schema.users.id, origin: schema.users.origin })
+    .from(schema.users)
+    .where(sql`lower(${schema.users.username}) = ${identifier.toLowerCase()}`)
+    .limit(1);
+  const target = rows[0];
+  if (!target) return { error: "Utilisateur introuvable." };
+  if (target.id === server.ownerId) {
+    return { error: "Le propriétaire a déjà tous les droits." };
+  }
+
+  await db()
+    .insert(schema.serverMembers)
+    .values({
+      serverId,
+      userId: target.id,
+      permissions: sanitizePermissions(
+        (await import("./permissions")).DEFAULT_MEMBER_PERMISSIONS,
+      ),
+    })
+    .onConflictDoNothing();
+
+  revalidatePath(`/servers/${serverId}/members`);
+  return {};
+}
+
+export async function updateMemberPermissions(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+  await requireServerPermission(user, serverId, "members.manage");
+
+  // Les cases cochées arrivent comme entrées "perm" multiples.
+  const permissions = sanitizePermissions(formData.getAll("perm").map(String));
+
+  await db()
+    .update(schema.serverMembers)
+    .set({ permissions, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.serverMembers.serverId, serverId),
+        eq(schema.serverMembers.userId, memberId),
+      ),
+    );
+  revalidatePath(`/servers/${serverId}/members`);
+  return {};
+}
+
+export async function removeMember(serverId: string, memberId: string) {
+  const user = await currentUser();
+  await requireServerPermission(user, serverId, "members.manage");
+  await db()
+    .delete(schema.serverMembers)
+    .where(
+      and(
+        eq(schema.serverMembers.serverId, serverId),
+        eq(schema.serverMembers.userId, memberId),
+      ),
+    );
+  revalidatePath(`/servers/${serverId}/members`);
 }
 
 // ---- Administration (droits + quotas) ----

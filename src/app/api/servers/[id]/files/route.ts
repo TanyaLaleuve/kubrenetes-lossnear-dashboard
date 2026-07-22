@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
 import { sessionUser } from "@/lib/auth/user";
 import { agentFetch, serverVolumeFor } from "@/lib/servers/files";
+import type { Permission } from "@/lib/servers/permissions";
 
-async function resolve(id: string) {
+async function resolve(id: string, permission: Permission) {
   const user = await sessionUser();
   if (!user) return { error: NextResponse.json({ error: "Non authentifié" }, { status: 401 }) };
   try {
-    const { vol } = await serverVolumeFor(user, id);
+    const { vol } = await serverVolumeFor(user, id, permission);
     return { vol };
   } catch (e) {
-    return {
-      error: NextResponse.json(
-        { error: e instanceof Error ? e.message : "Erreur" },
-        { status: 404 },
-      ),
-    };
+    const msg = e instanceof Error ? e.message : "Erreur";
+    const status = msg === "Accès refusé" ? 403 : 404;
+    return { error: NextResponse.json({ error: msg }, { status }) };
   }
 }
 
@@ -24,7 +22,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const { vol, error } = await resolve(id);
+  const { vol, error } = await resolve(id, "files.read");
   if (error) return error;
 
   const url = new URL(request.url);
@@ -63,12 +61,14 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const { vol, error } = await resolve(id);
-  if (error) return error;
-
   const url = new URL(request.url);
   const op = url.searchParams.get("op") ?? "";
   const path = url.searchParams.get("path") ?? "";
+
+  // delete → files.delete ; toute autre écriture → files.write
+  const permission = op === "delete" ? "files.delete" : "files.write";
+  const { vol, error } = await resolve(id, permission);
+  if (error) return error;
 
   switch (op) {
     case "write":

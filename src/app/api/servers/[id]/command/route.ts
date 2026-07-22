@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { sessionUser } from "@/lib/auth/user";
 import { getKubeConfig } from "@/lib/k8s/client";
-import { loadServerFor } from "@/lib/servers/authz";
+import { requireServerPermission } from "@/lib/servers/authz";
 import { SERVERS_NAMESPACE } from "@/lib/servers/k8s";
 
 const bodySchema = z.object({
@@ -25,9 +25,9 @@ export async function POST(
   const { id } = await params;
   let server;
   try {
-    server = await loadServerFor(user, id);
+    server = await requireServerPermission(user, id, "console.command");
   } catch {
-    return NextResponse.json({ error: "Serveur introuvable" }, { status: 404 });
+    return NextResponse.json({ error: "Accès refusé" }, { status: 403 });
   }
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));

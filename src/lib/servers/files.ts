@@ -2,7 +2,8 @@ import "server-only";
 import { coreApi } from "@/lib/k8s/client";
 import { env } from "@/lib/env";
 import type { SafeUser } from "@/lib/auth/user";
-import { loadServerFor } from "./authz";
+import { requireServerPermission } from "./authz";
+import type { Permission } from "./permissions";
 import { SERVERS_NAMESPACE } from "./k8s";
 
 /**
@@ -25,9 +26,13 @@ export async function resolveVolumeDir(slug: string): Promise<string | null> {
   }
 }
 
-/** Charge le serveur (authz) + résout son volume. Lève si indisponible. */
-export async function serverVolumeFor(user: SafeUser, id: string) {
-  const server = await loadServerFor(user, id);
+/** Vérifie la permission + résout le volume du serveur. Lève si indisponible. */
+export async function serverVolumeFor(
+  user: SafeUser,
+  id: string,
+  permission: Permission,
+) {
+  const server = await requireServerPermission(user, id, permission);
   const vol = await resolveVolumeDir(server.slug);
   if (!vol) {
     throw new Error(

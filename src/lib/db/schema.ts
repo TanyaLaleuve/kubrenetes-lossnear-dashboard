@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -99,3 +100,26 @@ export const servers = pgTable(
 );
 
 export type Server = typeof servers.$inferSelect;
+
+/**
+ * Membres invités sur un serveur (sous-utilisateurs, modèle Pterodactyl).
+ * `permissions` = liste de clés (voir lib/servers/permissions.ts).
+ * Le propriétaire n'apparaît pas ici : il a toutes les permissions d'office.
+ */
+export const serverMembers = pgTable(
+  "server_members",
+  {
+    serverId: uuid("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    permissions: text("permissions").array().notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.serverId, table.userId] })],
+);
+
+export type ServerMember = typeof serverMembers.$inferSelect;
