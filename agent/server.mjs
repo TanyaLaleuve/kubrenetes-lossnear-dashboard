@@ -99,14 +99,16 @@ async function listDir(target) {
 
 const server = createServer(async (req, res) => {
   try {
-    if (!authorized(req)) return json(res, 401, { error: "non autorisé" });
-
     const url = new URL(req.url, "http://agent");
     const route = url.pathname;
+
+    // Sonde de santé : pas d'authentification (probe kubelet).
+    if (route === "/healthz") return json(res, 200, { ok: true });
+
+    if (!authorized(req)) return json(res, 401, { error: "non autorisé" });
+
     const vol = url.searchParams.get("vol") || "";
     const rel = url.searchParams.get("path") || "";
-
-    if (route === "/healthz") return json(res, 200, { ok: true });
 
     const { target } = safePath(vol, rel);
 
