@@ -674,6 +674,7 @@ export async function removeMember(serverId: string, memberId: string) {
 
 const quotaSchema = z.object({
   userId: z.string().uuid(),
+  isAdmin: z.coerce.boolean(),
   canCreateServers: z.coerce.boolean(),
   quotaMaxServers: z.coerce.number().int().min(0).max(100),
   quotaMemoryMi: z.coerce.number().int().min(0).max(262144),
@@ -690,6 +691,7 @@ export async function updateUserGrants(
 
   const parsed = quotaSchema.safeParse({
     userId: formData.get("userId"),
+    isAdmin: formData.get("isAdmin") === "on",
     canCreateServers: formData.get("canCreateServers") === "on",
     quotaMaxServers: formData.get("quotaMaxServers"),
     quotaMemoryMi: formData.get("quotaMemoryMi"),
@@ -698,10 +700,11 @@ export async function updateUserGrants(
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  // Un admin ne peut pas se retirer ses propres droits par accident.
+  // Un admin ne peut pas modifier son propre compte ici (protection anti-lockout).
   await db()
     .update(schema.users)
     .set({
+      isAdmin: parsed.data.isAdmin,
       canCreateServers: parsed.data.canCreateServers,
       quotaMaxServers: parsed.data.quotaMaxServers,
       quotaMemoryMi: parsed.data.quotaMemoryMi,

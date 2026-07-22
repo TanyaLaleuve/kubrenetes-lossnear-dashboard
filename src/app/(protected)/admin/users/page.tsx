@@ -1,6 +1,7 @@
 import { asc, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
+import { CreateUserForm } from "@/components/CreateUserForm";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UserGrantsForm } from "@/components/UserGrantsForm";
 import { currentUser } from "@/lib/auth/user";
@@ -40,10 +41,12 @@ export default async function AdminUsersPage() {
       <header>
         <h1 className="text-xl font-semibold">Utilisateurs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {users.length} compte{users.length > 1 ? "s" : ""} — droits de création
+          {users.length} compte{users.length > 1 ? "s" : ""} — création, droits
           et quotas de serveurs
         </p>
       </header>
+
+      <CreateUserForm />
 
       <ul className="space-y-3">
         {users.map((user) => (

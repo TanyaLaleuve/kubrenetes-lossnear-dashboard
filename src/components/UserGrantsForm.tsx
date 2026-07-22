@@ -13,6 +13,7 @@ export function UserGrantsForm({
 }: {
   user: {
     id: string;
+    isAdmin: boolean;
     canCreateServers: boolean;
     quotaMaxServers: number;
     quotaMemoryMi: number;
@@ -25,15 +26,26 @@ export function UserGrantsForm({
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="userId" value={user.id} />
-      <label className="flex cursor-pointer items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          name="canCreateServers"
-          defaultChecked={user.canCreateServers}
-          className="size-4 accent-(--accent)"
-        />
-        Peut créer des serveurs
-      </label>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="canCreateServers"
+            defaultChecked={user.canCreateServers}
+            className="size-4 accent-(--accent)"
+          />
+          Peut créer des serveurs
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="isAdmin"
+            defaultChecked={user.isAdmin}
+            className="size-4 accent-(--accent)"
+          />
+          Administrateur
+        </label>
+      </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <label className="space-y-1 text-xs text-muted-foreground">
           Serveurs max
