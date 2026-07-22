@@ -18,12 +18,19 @@ const usernameSchema = z
 
 const emailSchema = z.string().trim().toLowerCase().email("Email invalide");
 
+/**
+ * Drizzle enveloppe l'erreur postgres du driver dans une DrizzleQueryError :
+ * le vrai code d'erreur ("23505" = contrainte unique violée) est sur
+ * `.cause.code`, pas directement sur `.code`.
+ */
 function isUniqueViolation(error: unknown): boolean {
+  const code = (e: unknown) =>
+    typeof e === "object" && e !== null && "code" in e
+      ? (e as { code?: string }).code
+      : undefined;
   return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "23505"
+    code(error) === "23505" ||
+    code((error as { cause?: unknown } | null)?.cause) === "23505"
   );
 }
 

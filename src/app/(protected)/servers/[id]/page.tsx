@@ -64,6 +64,15 @@ export default async function ServerDetailPage({
     can("settings.manage") ||
     can("members.manage");
   const canAnyManage = can("files.read") || can("members.read") || canModifySettings;
+  // Onglet Paramètres cible : le premier accessible (même ordre que
+  // SettingsNav), pour ne pas atterrir sur Général sans la permission.
+  const settingsHref = privileged || can("settings.general")
+    ? `/servers/${server.id}/settings`
+    : can("members.read") || can("members.manage")
+      ? `/servers/${server.id}/settings/permissions`
+      : can("settings.egg")
+        ? `/servers/${server.id}/settings/egg`
+        : `/servers/${server.id}/settings/management`;
 
   const status = await serverRuntimeStatus(server).catch(() => ({
     label: "Error" as const,
@@ -178,7 +187,7 @@ export default async function ServerDetailPage({
           )}
           {canModifySettings && (
             <Link
-              href={`/servers/${server.id}/settings`}
+              href={settingsHref}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
             >
               <Settings className="size-4" aria-hidden />

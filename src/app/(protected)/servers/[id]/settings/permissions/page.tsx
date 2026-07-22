@@ -18,7 +18,12 @@ export default async function ServerSettingsPermissionsPage({
   const user = await currentUser();
 
   const access = await serverAccess(user, id);
-  if (!access || (!access.privileged && !access.permissions.has("members.read"))) {
+  if (
+    !access ||
+    (!access.privileged &&
+      !access.permissions.has("members.read") &&
+      !access.permissions.has("members.manage"))
+  ) {
     redirect(`/servers/${id}`);
   }
 

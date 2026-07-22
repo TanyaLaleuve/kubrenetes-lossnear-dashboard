@@ -25,7 +25,11 @@ export default async function ServerSettingsLayout({
   // sous-page vérifie ensuite sa propre permission.
   const tabs = {
     general: !!access && (access.privileged || access.permissions.has("settings.general")),
-    permissions: !!access && (access.privileged || access.permissions.has("members.read")),
+    permissions:
+      !!access &&
+      (access.privileged ||
+        access.permissions.has("members.read") ||
+        access.permissions.has("members.manage")),
     egg: !!access && (access.privileged || access.permissions.has("settings.egg")),
     management: !!access && (access.privileged || access.permissions.has("settings.manage")),
   };
