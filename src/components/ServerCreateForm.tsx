@@ -15,10 +15,16 @@ export function ServerCreateForm({
   maxMemoryMi,
   maxCpuMilli,
   maxDiskGi,
+  canChoosePort,
+  portMin,
+  portMax,
 }: {
   maxMemoryMi: number;
   maxCpuMilli: number;
   maxDiskGi: number;
+  canChoosePort: boolean;
+  portMin: number;
+  portMax: number;
 }) {
   const [state, action, pending] = useActionState(createServer, initialState);
   const [envRows, setEnvRows] = useState<EnvRow[]>([
@@ -144,26 +150,30 @@ export function ServerCreateForm({
             className={inputClass}
           />
         </div>
-        <div className="space-y-1.5">
-          <label htmlFor="hostPort" className="text-xs text-muted-foreground">
-            Port externe (optionnel)
-          </label>
-          <input
-            id="hostPort"
-            name="hostPort"
-            type="number"
-            min={25600}
-            max={25699}
-            placeholder="auto"
-            data-keep-empty
-            className={inputClass}
-          />
-        </div>
+        {canChoosePort && (
+          <div className="space-y-1.5">
+            <label htmlFor="hostPort" className="text-xs text-muted-foreground">
+              Port externe (optionnel)
+            </label>
+            <input
+              id="hostPort"
+              name="hostPort"
+              type="number"
+              min={portMin}
+              max={portMax}
+              placeholder="auto"
+              data-keep-empty
+              className={inputClass}
+            />
+          </div>
+        )}
       </fieldset>
-      <p className="-mt-2 text-xs text-muted-foreground">
-        Port externe : laisser vide = attribué automatiquement (plage
-        25600-25699).
-      </p>
+      {canChoosePort && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Port externe : laisser vide = attribué automatiquement (plage{" "}
+          {portMin}-{portMax}).
+        </p>
+      )}
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">

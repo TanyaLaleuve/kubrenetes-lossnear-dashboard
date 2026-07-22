@@ -29,6 +29,8 @@ export default async function AdminUsersPage() {
       quotaMemoryMi: schema.users.quotaMemoryMi,
       quotaCpuMilli: schema.users.quotaCpuMilli,
       quotaDiskGi: schema.users.quotaDiskGi,
+      portRangeStart: schema.users.portRangeStart,
+      portRangeEnd: schema.users.portRangeEnd,
       hasAvatar: sql<boolean>`${schema.users.avatar} is not null`,
       serverCount: sql<number>`(
         select count(*)::int from ${schema.servers}

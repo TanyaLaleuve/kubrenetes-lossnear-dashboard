@@ -14,10 +14,16 @@ export function ServerGeneralForm({
   server,
   users,
   isPrivileged,
+  canChoosePort,
+  portMin,
+  portMax,
 }: {
   server: ServerType;
   users: UserItem[];
   isPrivileged: boolean;
+  canChoosePort: boolean;
+  portMin: number;
+  portMax: number;
 }) {
   const [state, formAction, pending] = useActionState<ServerFormState, FormData>(
     updateServerGeneralSettings,
@@ -149,15 +155,18 @@ export function ServerGeneralForm({
             id="hostPort"
             name="hostPort"
             type="number"
-            min={25600}
-            max={25699}
+            min={portMin}
+            max={portMax}
             required
             defaultValue={server.hostPort}
+            readOnly={!canChoosePort}
             disabled={!isPrivileged}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground read-only:opacity-60 focus:border-accent focus:outline-none disabled:opacity-50"
           />
           <p className="text-[11px] text-muted-foreground">
-            Port public de connexion (plage 25600-25699). Doit être libre.
+            {canChoosePort
+              ? `Port public de connexion (plage ${portMin}-${portMax}). Doit être libre.`
+              : "Attribué automatiquement — tu n'as pas la permission de le changer."}
           </p>
         </div>
 

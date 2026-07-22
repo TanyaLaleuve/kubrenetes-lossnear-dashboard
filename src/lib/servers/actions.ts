@@ -10,6 +10,8 @@ import { requirePrivileged, requireServerPermission } from "./authz";
 import { DEFAULT_IMAGE } from "./constants";
 import { sanitizePermissions } from "./permissions";
 import { builtinVars, EGG_MOUNT_PATH, resolveEnv } from "./eggs";
+import { userPortRange } from "./ports";
+import { canChoosePort } from "@/lib/auth/dashboard-permissions";
 import {
   applyServer,
   destroyServer,
@@ -112,20 +114,25 @@ async function reserveSlot(
     .select({ hostPort: schema.servers.hostPort })
     .from(schema.servers);
   const usedPorts = new Set(used.map((r) => r.hostPort));
+  const { min, max } = userPortRange(user);
 
-  // Port demandé explicitement : on vérifie qu'il est libre.
-  if (desiredPort != null) {
+  // Port demandé explicitement : uniquement si l'utilisateur a la permission,
+  // dans sa plage et libre. Sinon on ignore et on attribue automatiquement.
+  if (desiredPort != null && canChoosePort(user)) {
+    if (desiredPort < min || desiredPort > max) {
+      return { error: `Port hors de ta plage autorisée (${min}-${max}).` };
+    }
     if (usedPorts.has(desiredPort)) {
       return { error: `Le port ${desiredPort} est déjà utilisé par un autre serveur.` };
     }
     return { hostPort: desiredPort };
   }
 
-  // Sinon : premier port libre de la plage dédiée.
-  for (let p = HOST_PORT_MIN; p <= HOST_PORT_MAX; p++) {
+  // Sinon : premier port libre de la plage allouée.
+  for (let p = min; p <= max; p++) {
     if (!usedPorts.has(p)) return { hostPort: p };
   }
-  return { error: "Plus aucun port disponible sur la plage dédiée." };
+  return { error: `Plus aucun port disponible dans ta plage (${min}-${max}).` };
 }
 
 export async function createServer(
@@ -423,27 +430,36 @@ export async function updateServerGeneralSettings(
   }
   const input = parsed.data;
 
-  // Port externe : s'il change, vérifier qu'aucun autre serveur ne l'utilise.
-  if (input.hostPort !== server.hostPort) {
-    const clash = await db()
-      .select({ id: schema.servers.id })
-      .from(schema.servers)
-      .where(
-        and(
-          eq(schema.servers.hostPort, input.hostPort),
-          ne(schema.servers.id, server.id),
-        ),
-      )
-      .limit(1);
-    if (clash[0]) {
-      return { error: `Le port ${input.hostPort} est déjà utilisé par un autre serveur.` };
+  // Port externe : modifiable seulement si l'utilisateur a la permission,
+  // dans sa plage, et libre. Sinon on garde le port actuel.
+  let newHostPort = server.hostPort;
+  if (canChoosePort(user)) {
+    const { min, max } = userPortRange(user);
+    if (input.hostPort < min || input.hostPort > max) {
+      return { error: `Port hors de ta plage autorisée (${min}-${max}).` };
     }
+    if (input.hostPort !== server.hostPort) {
+      const clash = await db()
+        .select({ id: schema.servers.id })
+        .from(schema.servers)
+        .where(
+          and(
+            eq(schema.servers.hostPort, input.hostPort),
+            ne(schema.servers.id, server.id),
+          ),
+        )
+        .limit(1);
+      if (clash[0]) {
+        return { error: `Le port ${input.hostPort} est déjà utilisé par un autre serveur.` };
+      }
+    }
+    newHostPort = input.hostPort;
   }
 
   const updateData: Record<string, unknown> = {
     name: input.name,
     containerPort: input.containerPort,
-    hostPort: input.hostPort,
+    hostPort: newHostPort,
     cpuMilli: input.cpuMilli,
     memoryMi: input.memoryMi,
     displayAddress: input.displayAddress || null,
@@ -680,6 +696,8 @@ const quotaSchema = z.object({
   quotaMemoryMi: z.coerce.number().int().min(0).max(262144),
   quotaCpuMilli: z.coerce.number().int().min(0).max(64000),
   quotaDiskGi: z.coerce.number().int().min(0).max(2000),
+  portRangeStart: optionalHostPort(),
+  portRangeEnd: optionalHostPort(),
 });
 
 export async function updateUserGrants(
@@ -697,8 +715,18 @@ export async function updateUserGrants(
     quotaMemoryMi: formData.get("quotaMemoryMi"),
     quotaCpuMilli: formData.get("quotaCpuMilli"),
     quotaDiskGi: formData.get("quotaDiskGi"),
+    portRangeStart: formData.get("portRangeStart"),
+    portRangeEnd: formData.get("portRangeEnd"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  const { portRangeStart, portRangeEnd } = parsed.data;
+  if ((portRangeStart == null) !== (portRangeEnd == null)) {
+    return { error: "Plage de ports : renseigne les deux bornes ou aucune." };
+  }
+  if (portRangeStart != null && portRangeEnd != null && portRangeStart > portRangeEnd) {
+    return { error: "Plage de ports : le début doit être ≤ la fin." };
+  }
 
   // Un admin ne peut pas modifier son propre compte ici (protection anti-lockout).
   await db()
@@ -710,6 +738,8 @@ export async function updateUserGrants(
       quotaMemoryMi: parsed.data.quotaMemoryMi,
       quotaCpuMilli: parsed.data.quotaCpuMilli,
       quotaDiskGi: parsed.data.quotaDiskGi,
+      portRangeStart: portRangeStart ?? null,
+      portRangeEnd: portRangeEnd ?? null,
       updatedAt: new Date(),
     })
     .where(

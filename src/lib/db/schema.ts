@@ -54,6 +54,12 @@ export const users = pgTable(
     quotaMemoryMi: integer("quota_memory_mi").notNull().default(4096),
     quotaCpuMilli: integer("quota_cpu_milli").notNull().default(2000),
     quotaDiskGi: integer("quota_disk_gi").notNull().default(10),
+    /**
+     * Plage de ports externes allouée (contraint choix manuel ET auto).
+     * null = plage globale par défaut (voir HOST_PORT_MIN/MAX).
+     */
+    portRangeStart: integer("port_range_start"),
+    portRangeEnd: integer("port_range_end"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

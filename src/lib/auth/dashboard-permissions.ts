@@ -15,6 +15,11 @@ export const DASHBOARD_PERMISSION_GROUPS = [
         label: "Section Serveurs",
         hint: "Voir et gérer ses serveurs (+ ceux où l'on est invité).",
       },
+      {
+        key: "servers.choose_port",
+        label: "Choisir le port externe",
+        hint: "Sinon le port est attribué automatiquement dans sa plage.",
+      },
     ],
   },
   {
@@ -52,6 +57,17 @@ export function canAccess(
   perm: string,
 ): boolean {
   return user.isAdmin || user.permissions.includes(perm);
+}
+
+/** Clé de permission : choisir soi-même le port externe d'un serveur. */
+export const CHOOSE_PORT_PERMISSION = "servers.choose_port";
+
+/** L'utilisateur peut-il choisir son port externe ? (admin = toujours oui) */
+export function canChoosePort(user: {
+  isAdmin: boolean;
+  permissions: string[];
+}): boolean {
+  return canAccess(user, CHOOSE_PORT_PERMISSION);
 }
 
 /**

@@ -23,11 +23,17 @@ export function EggServerForm({
   maxMemoryMi,
   maxCpuMilli,
   maxDiskGi,
+  canChoosePort,
+  portMin,
+  portMax,
 }: {
   egg: EggLite;
   maxMemoryMi: number;
   maxCpuMilli: number;
   maxDiskGi: number;
+  canChoosePort: boolean;
+  portMin: number;
+  portMax: number;
 }) {
   const [state, action, pending] = useActionState(
     createServerFromEgg,
@@ -168,25 +174,30 @@ export function EggServerForm({
             className={inputClass}
           />
         </div>
-        <div className="space-y-1.5">
-          <label htmlFor="hostPort" className="text-xs text-muted-foreground">
-            Port externe (optionnel)
-          </label>
-          <input
-            id="hostPort"
-            name="hostPort"
-            type="number"
-            min={25600}
-            max={25699}
-            placeholder="auto"
-            data-keep-empty
-            className={inputClass}
-          />
-        </div>
+        {canChoosePort && (
+          <div className="space-y-1.5">
+            <label htmlFor="hostPort" className="text-xs text-muted-foreground">
+              Port externe (optionnel)
+            </label>
+            <input
+              id="hostPort"
+              name="hostPort"
+              type="number"
+              min={portMin}
+              max={portMax}
+              placeholder="auto"
+              data-keep-empty
+              className={inputClass}
+            />
+          </div>
+        )}
       </fieldset>
-      <p className="-mt-2 text-xs text-muted-foreground">
-        Port externe : vide = attribué automatiquement (plage 25600-25699).
-      </p>
+      {canChoosePort && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          Port externe : vide = attribué automatiquement (plage {portMin}-
+          {portMax}).
+        </p>
+      )}
 
       {state.error && (
         <p role="alert" className="text-sm text-destructive">
