@@ -2,6 +2,7 @@
 
 import { useActionState, useRef, useEffect } from "react";
 import { UserPlus } from "lucide-react";
+import { ToggleSwitch } from "@/components/ToggleSwitch";
 import { createUser, type AdminFormState } from "@/lib/admin/actions";
 
 const initialState: AdminFormState = {};
@@ -66,15 +67,13 @@ export function CreateUserForm() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-x-5 gap-y-2">
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" name="canCreateServers" defaultChecked className="size-4 accent-(--accent)" />
-          Peut créer des serveurs
-        </label>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" name="isAdmin" className="size-4 accent-(--accent)" />
-          Administrateur
-        </label>
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
+        <ToggleSwitch
+          name="canCreateServers"
+          defaultChecked
+          label="Peut créer des serveurs"
+        />
+        <ToggleSwitch name="isAdmin" label="Administrateur" />
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

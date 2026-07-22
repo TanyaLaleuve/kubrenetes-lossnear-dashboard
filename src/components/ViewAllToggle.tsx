@@ -1,16 +1,17 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ToggleSwitch } from "@/components/ToggleSwitch";
 
-/** Case à cocher "tous les serveurs" — préserve les autres paramètres d'URL (tri…). */
+/** Interrupteur "tous les serveurs" — préserve les autres paramètres d'URL (tri…). */
 export function ViewAllToggle({ checked }: { checked: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  function onChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function onChange(next: boolean) {
     const params = new URLSearchParams(searchParams.toString());
-    if (e.target.checked) {
+    if (next) {
       params.set("all", "1");
     } else {
       params.delete("all");
@@ -20,14 +21,10 @@ export function ViewAllToggle({ checked }: { checked: boolean }) {
   }
 
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 py-1 text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={onChange}
-        className="size-4 accent-(--accent)"
-      />
-      Tous les serveurs du cluster
-    </label>
+    <ToggleSwitch
+      checked={checked}
+      onChange={onChange}
+      label="Tous les serveurs du cluster"
+    />
   );
 }
