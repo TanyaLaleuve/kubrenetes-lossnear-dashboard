@@ -1,5 +1,6 @@
 import { currentUser } from "@/lib/auth/user";
 import { Nav } from "@/components/Nav";
+import { FormPlaceholderDefaults } from "@/components/FormPlaceholderDefaults";
 
 export default async function ProtectedLayout({
   children,
@@ -8,6 +9,7 @@ export default async function ProtectedLayout({
 
   return (
     <div className="min-h-dvh">
+      <FormPlaceholderDefaults />
       <Nav
         user={{
           id: user.id,

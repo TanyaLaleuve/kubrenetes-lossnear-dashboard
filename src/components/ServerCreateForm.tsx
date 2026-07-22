@@ -182,6 +182,7 @@ export function ServerCreateForm({
                 )
               }
               placeholder="CLE"
+              data-keep-empty
               className={`${inputClass} font-mono uppercase`}
             />
             <input
@@ -195,6 +196,7 @@ export function ServerCreateForm({
                 )
               }
               placeholder="valeur"
+              data-keep-empty
               className={`${inputClass} font-mono`}
             />
             <button

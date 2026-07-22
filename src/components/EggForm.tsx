@@ -19,7 +19,7 @@ export function EggForm({ egg }: { egg?: Egg }) {
   const [state, action, pending] = useActionState(saveEgg, initialState);
 
   return (
-    <form action={action} className="space-y-5">
+    <form action={action} className="space-y-5" data-keep-empty>
       {egg && <input type="hidden" name="eggId" value={egg.id} />}
 
       <div className="grid gap-4 sm:grid-cols-2">

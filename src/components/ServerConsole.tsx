@@ -137,6 +137,7 @@ export function ServerConsole({
               value={command}
               onChange={(event) => setCommand(event.target.value)}
               disabled={!running}
+              data-keep-empty
               placeholder={running ? "commande (ex. list, say coucou)" : "serveur arrêté"}
               aria-label="Commande console"
               className="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/50"

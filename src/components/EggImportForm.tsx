@@ -17,7 +17,7 @@ export function EggImportForm() {
   }
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-4" data-keep-empty>
       <div className="flex flex-wrap items-center gap-2">
         <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground">
           <Upload className="size-3.5" aria-hidden />

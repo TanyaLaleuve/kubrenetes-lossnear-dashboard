@@ -78,6 +78,7 @@ export function ServerAddress({
             name="displayAddress"
             defaultValue={address ?? ""}
             placeholder={fallback}
+            data-keep-empty
             aria-label="Adresse affichée (domaine)"
             className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 font-mono text-sm outline-none transition-colors duration-150 focus:border-accent"
           />

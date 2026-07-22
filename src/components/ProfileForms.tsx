@@ -70,6 +70,7 @@ export function EmailForm({ email }: { email: string | null }) {
           defaultValue={email ?? ""}
           placeholder="tanya@lossnear.com"
           required
+          data-keep-empty
           className={inputClass}
         />
         <p className="text-xs text-muted-foreground">
