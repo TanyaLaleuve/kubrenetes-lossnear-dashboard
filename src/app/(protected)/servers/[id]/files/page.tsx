@@ -3,8 +3,10 @@ import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { FileManager } from "@/components/FileManager";
+import { SftpInfo } from "@/components/SftpInfo";
 import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
+import { PUBLIC_IP } from "@/lib/servers/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,12 @@ export default async function ServerFilesPage({
           <p className="text-xs text-muted-foreground">Fichiers du serveur</p>
         </div>
       </header>
+
+      <SftpInfo
+        host={PUBLIC_IP}
+        port={2222}
+        username={`${user.username}.${server.id}`}
+      />
 
       <FileManager serverId={server.id} />
     </div>

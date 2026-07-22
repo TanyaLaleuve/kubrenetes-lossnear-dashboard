@@ -24,6 +24,11 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+            - name: sftp
+              containerPort: 2222
+              # Exposé sur le nœud pour les clients SFTP externes.
+              hostPort: 2222
+              protocol: TCP
           env:
             - name: STORAGE_ROOT
               value: /data-root

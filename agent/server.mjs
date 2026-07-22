@@ -22,16 +22,42 @@ import {
 } from "node:fs/promises";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
-import { timingSafeEqual } from "node:crypto";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { generateKeyPairSync, timingSafeEqual } from "node:crypto";
+import { startSftp } from "./sftp.mjs";
 
 const STORAGE_ROOT = process.env.STORAGE_ROOT || "/data-root";
 const TOKEN = process.env.AGENT_TOKEN || "";
 const PORT = Number(process.env.PORT || 8080);
+const SFTP_PORT = Number(process.env.SFTP_PORT || 2222);
+const SFTP_AUTH_URL =
+  process.env.SFTP_AUTH_URL ||
+  "http://k8s-dashboard.lossnear-system.svc.cluster.local/api/internal/sftp-auth";
 const MAX_EDIT_BYTES = 2 * 1024 * 1024; // fichiers texte éditables : 2 Mo
 
 if (!TOKEN) {
   console.error("AGENT_TOKEN manquant");
   process.exit(1);
+}
+
+/** Host key SSH persistante sur le disque du nœud (stable entre redémarrages). */
+function loadHostKey() {
+  const dir = join(STORAGE_ROOT, ".lossnear-agent");
+  const keyPath = join(dir, "sftp_host_rsa");
+  if (existsSync(keyPath)) return readFileSync(keyPath);
+  mkdirSync(dir, { recursive: true });
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs1", format: "pem" },
+    publicKeyEncoding: { type: "pkcs1", format: "pem" },
+  });
+  writeFileSync(keyPath, privateKey, { mode: 0o600 });
+  return Buffer.from(privateKey);
 }
 
 function authorized(req) {
@@ -176,4 +202,13 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`[agent] écoute sur :${PORT}, racine ${STORAGE_ROOT}`);
+});
+
+// Serveur SFTP (accès fichiers par client SFTP, auth déléguée au dashboard).
+startSftp({
+  port: SFTP_PORT,
+  hostKey: loadHostKey(),
+  storageRoot: STORAGE_ROOT,
+  authUrl: SFTP_AUTH_URL,
+  agentToken: TOKEN,
 });
