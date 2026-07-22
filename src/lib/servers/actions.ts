@@ -42,11 +42,25 @@ const createSchema = z.object({
   ),
   command: z.string().trim().max(500).optional(),
   containerPort: z.coerce.number().int().min(1).max(65535).default(25565),
+  hostPort: optionalHostPort(),
   cpuMilli: z.coerce.number().int().min(250).max(16000),
   memoryMi: z.coerce.number().int().min(256).max(32768),
   diskGi: z.coerce.number().int().min(1).max(200),
   env: z.string().optional(), // JSON {clé: valeur} sérialisé par le formulaire
 });
+
+/** Port externe (hostPort) optionnel : vide = attribution automatique. */
+function optionalHostPort() {
+  return z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z
+      .coerce.number()
+      .int()
+      .min(HOST_PORT_MIN, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`)
+      .max(HOST_PORT_MAX, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`)
+      .optional(),
+  );
+}
 
 function slugify(name: string): string {
   const base = name
@@ -69,6 +83,7 @@ type SlotResources = { memoryMi: number; cpuMilli: number; diskGi: number };
 async function reserveSlot(
   user: Awaited<ReturnType<typeof currentUser>>,
   res: SlotResources,
+  desiredPort?: number | null,
 ): Promise<{ hostPort: number } | { error: string }> {
   const database = db();
 
@@ -97,6 +112,16 @@ async function reserveSlot(
     .select({ hostPort: schema.servers.hostPort })
     .from(schema.servers);
   const usedPorts = new Set(used.map((r) => r.hostPort));
+
+  // Port demandé explicitement : on vérifie qu'il est libre.
+  if (desiredPort != null) {
+    if (usedPorts.has(desiredPort)) {
+      return { error: `Le port ${desiredPort} est déjà utilisé par un autre serveur.` };
+    }
+    return { hostPort: desiredPort };
+  }
+
+  // Sinon : premier port libre de la plage dédiée.
   for (let p = HOST_PORT_MIN; p <= HOST_PORT_MAX; p++) {
     if (!usedPorts.has(p)) return { hostPort: p };
   }
@@ -129,7 +154,7 @@ export async function createServer(
 
   const database = db();
 
-  const slot = await reserveSlot(user, input);
+  const slot = await reserveSlot(user, input, input.hostPort);
   if ("error" in slot) return { error: slot.error };
   const hostPort = slot.hostPort;
 
@@ -161,6 +186,7 @@ const fromEggSchema = z.object({
   name: z.string().trim().min(3, "Nom : 3 caractères minimum").max(48),
   image: z.string().trim().min(3).max(255),
   containerPort: z.coerce.number().int().min(1).max(65535).default(25565),
+  hostPort: optionalHostPort(),
   cpuMilli: z.coerce.number().int().min(250).max(16000),
   memoryMi: z.coerce.number().int().min(256).max(32768),
   diskGi: z.coerce.number().int().min(1).max(200),
@@ -205,7 +231,7 @@ export async function createServerFromEgg(
     builtinVars({ memoryMi: input.memoryMi, containerPort: input.containerPort }),
   );
 
-  const slot = await reserveSlot(user, input);
+  const slot = await reserveSlot(user, input, input.hostPort);
   if ("error" in slot) return { error: slot.error };
 
   const [server] = await db()
@@ -362,9 +388,13 @@ const generalSettingsSchema = z.object({
   name: z.string().trim().min(3, "Nom : 3 caractères minimum").max(48),
   ownerId: z.string().uuid().optional(),
   containerPort: z.coerce.number().int().min(1).max(65535),
+  hostPort: z.coerce
+    .number()
+    .int()
+    .min(HOST_PORT_MIN, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`)
+    .max(HOST_PORT_MAX, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`),
   cpuMilli: z.coerce.number().int().min(250).max(16000),
   memoryMi: z.coerce.number().int().min(256).max(32768),
-  diskGi: z.coerce.number().int().min(1).max(200),
   displayAddress: z.string().trim().max(255).optional(),
 });
 
@@ -382,9 +412,9 @@ export async function updateServerGeneralSettings(
     name: formData.get("name"),
     ownerId: formData.get("ownerId") || undefined,
     containerPort: formData.get("containerPort"),
+    hostPort: formData.get("hostPort"),
     cpuMilli: formData.get("cpuMilli"),
     memoryMi: formData.get("memoryMi"),
-    diskGi: formData.get("diskGi"),
     displayAddress: formData.get("displayAddress") || undefined,
   });
 
@@ -393,17 +423,27 @@ export async function updateServerGeneralSettings(
   }
   const input = parsed.data;
 
-  // La taille du disque est immuable après création (volumeClaimTemplates K8s).
-  if (input.diskGi !== server.diskGi) {
-    return {
-      error:
-        "La taille du disque ne peut pas être modifiée après la création du serveur.",
-    };
+  // Port externe : s'il change, vérifier qu'aucun autre serveur ne l'utilise.
+  if (input.hostPort !== server.hostPort) {
+    const clash = await db()
+      .select({ id: schema.servers.id })
+      .from(schema.servers)
+      .where(
+        and(
+          eq(schema.servers.hostPort, input.hostPort),
+          ne(schema.servers.id, server.id),
+        ),
+      )
+      .limit(1);
+    if (clash[0]) {
+      return { error: `Le port ${input.hostPort} est déjà utilisé par un autre serveur.` };
+    }
   }
 
   const updateData: Record<string, unknown> = {
     name: input.name,
     containerPort: input.containerPort,
+    hostPort: input.hostPort,
     cpuMilli: input.cpuMilli,
     memoryMi: input.memoryMi,
     displayAddress: input.displayAddress || null,

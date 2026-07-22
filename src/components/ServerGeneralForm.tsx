@@ -140,10 +140,31 @@ export function ServerGeneralForm({
           </p>
         </div>
 
-        {/* Port conteneur */}
+        {/* Port externe (public / hostPort) */}
+        <div className="space-y-2">
+          <label htmlFor="hostPort" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <Globe className="size-3.5" /> Port externe (public)
+          </label>
+          <input
+            id="hostPort"
+            name="hostPort"
+            type="number"
+            min={25600}
+            max={25699}
+            required
+            defaultValue={server.hostPort}
+            disabled={!isPrivileged}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Port public de connexion (plage 25600-25699). Doit être libre.
+          </p>
+        </div>
+
+        {/* Port interne conteneur */}
         <div className="space-y-2">
           <label htmlFor="containerPort" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Server className="size-3.5" /> Port conteneur
+            <Server className="size-3.5" /> Port interne (conteneur)
           </label>
           <input
             id="containerPort"
