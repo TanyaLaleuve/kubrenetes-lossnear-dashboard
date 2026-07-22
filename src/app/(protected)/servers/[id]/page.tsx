@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
-import { ArrowLeft, FolderOpen, Play, RotateCw, Skull, Square } from "lucide-react";
+import {
+  ArrowLeft,
+  FolderOpen,
+  Play,
+  RotateCw,
+  Settings,
+  Skull,
+  Square,
+  Users,
+} from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -100,8 +109,9 @@ export default async function ServerDetailPage({
         <StatusBadge label={status.label} tone={status.tone} />
       </header>
 
+      {/* Contrôles d'alimentation : démarrer / arrêter / redémarrer / kill. */}
       <section
-        aria-label="Contrôles"
+        aria-label="Alimentation"
         className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
       >
         {!running ? (
@@ -134,6 +144,13 @@ export default async function ServerDetailPage({
             Kill
           </ServerActionButton>
         )}
+      </section>
+
+      {/* Gestion : fichiers, permissions, paramètres (à venir), suppression. */}
+      <section
+        aria-label="Gestion"
+        className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
+      >
         <Link
           href={`/servers/${server.id}/files`}
           className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
@@ -141,6 +158,20 @@ export default async function ServerDetailPage({
           <FolderOpen className="size-4" aria-hidden />
           Fichiers
         </Link>
+        <span
+          className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground/50"
+          title="Bientôt"
+        >
+          <Users className="size-4" aria-hidden />
+          Permissions
+        </span>
+        <span
+          className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground/50"
+          title="Bientôt"
+        >
+          <Settings className="size-4" aria-hidden />
+          Paramètres
+        </span>
         <div className="ml-auto">
           <ConfirmButton
             action={deleteServer.bind(null, server.id)}
