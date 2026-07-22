@@ -87,6 +87,20 @@ export const servers = pgTable(
     cpuMilli: integer("cpu_milli").notNull(),
     memoryMi: integer("memory_mi").notNull(),
     diskGi: integer("disk_gi").notNull(),
+    /** Egg d'origine (bibliothèque) — provenance / réinstallation. */
+    eggId: uuid("egg_id").references(() => eggs.id, { onDelete: "set null" }),
+    /**
+     * Commande de démarrage shell (issue de l'egg), exécutée via sh -c avec
+     * substitution {{VAR}}. Si null : mode image libre (args = `command`).
+     */
+    startup: text("startup"),
+    stopCommand: varchar("stop_command", { length: 255 }),
+    /** Script d'install joué une fois au 1er démarrage (initContainer). */
+    installScript: text("install_script"),
+    installContainer: varchar("install_container", { length: 255 }),
+    installEntrypoint: varchar("install_entrypoint", { length: 64 }),
+    /** Point de montage du volume dans le conteneur (egg : /home/container). */
+    mountPath: varchar("mount_path", { length: 255 }).notNull().default("/data"),
     desiredState: serverState("desired_state").notNull().default("stopped"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -100,6 +114,61 @@ export const servers = pgTable(
 );
 
 export type Server = typeof servers.$inferSelect;
+
+/** Provenance d'un egg : importé d'un JSON Pterodactyl ou créé sur mesure. */
+export const eggSource = pgEnum("egg_source", ["imported", "custom"]);
+
+/**
+ * « Egg » (œuf) = modèle de serveur, façon Pterodactyl : image(s), commande de
+ * démarrage, script d'installation et variables configurables. Bibliothèque
+ * partagée gérée par les admins ; réutilisée à la création d'un serveur.
+ */
+export const eggs = pgTable("eggs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 96 }).notNull(),
+  description: text("description").notNull().default(""),
+  author: varchar("author", { length: 128 }),
+  /** Variantes d'image { libellé: image } — au moins une. */
+  dockerImages: jsonb("docker_images")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default({}),
+  /** Commande de démarrage (template avec {{VAR}}), exécutée via sh -c. */
+  startup: text("startup").notNull().default(""),
+  /** Commande d'arrêt gracieux (ex. "stop") ou signal (ex. "^C"). */
+  stopCommand: varchar("stop_command", { length: 255 }),
+  /** Script d'installation (bash), joué une fois via un initContainer. */
+  installScript: text("install_script"),
+  installContainer: varchar("install_container", { length: 255 })
+    .notNull()
+    .default("debian:bookworm-slim"),
+  installEntrypoint: varchar("install_entrypoint", { length: 64 })
+    .notNull()
+    .default("bash"),
+  /** Variables configurables (voir EggVariable dans lib/servers/eggs.ts). */
+  variables: jsonb("variables")
+    .$type<
+      {
+        name: string;
+        description: string;
+        envVariable: string;
+        defaultValue: string;
+        userEditable: boolean;
+        userViewable: boolean;
+        rules: string;
+      }[]
+    >()
+    .notNull()
+    .default([]),
+  source: eggSource("source").notNull().default("custom"),
+  createdBy: uuid("created_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Egg = typeof eggs.$inferSelect;
 
 /**
  * Membres invités sur un serveur (sous-utilisateurs, modèle Pterodactyl).

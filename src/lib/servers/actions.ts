@@ -9,6 +9,7 @@ import { currentUser } from "@/lib/auth/user";
 import { requirePrivileged, requireServerPermission } from "./authz";
 import { DEFAULT_IMAGE } from "./constants";
 import { sanitizePermissions } from "./permissions";
+import { builtinVars, EGG_MOUNT_PATH, resolveEnv } from "./eggs";
 import {
   applyServer,
   destroyServer,
@@ -58,6 +59,49 @@ function slugify(name: string): string {
   return `srv-${base || "server"}-${suffix}`.slice(0, 40);
 }
 
+type SlotResources = { memoryMi: number; cpuMilli: number; diskGi: number };
+
+/**
+ * Vérifie les quotas de l'utilisateur et réserve un port hôte libre.
+ * Renvoie le port attribué ou un message d'erreur.
+ */
+async function reserveSlot(
+  user: Awaited<ReturnType<typeof currentUser>>,
+  res: SlotResources,
+): Promise<{ hostPort: number } | { error: string }> {
+  const database = db();
+
+  const [usage] = await database
+    .select({
+      count: sql<number>`count(*)::int`,
+      memoryMi: sql<number>`coalesce(sum(${schema.servers.memoryMi}), 0)::int`,
+      cpuMilli: sql<number>`coalesce(sum(${schema.servers.cpuMilli}), 0)::int`,
+      diskGi: sql<number>`coalesce(sum(${schema.servers.diskGi}), 0)::int`,
+    })
+    .from(schema.servers)
+    .where(eq(schema.servers.ownerId, user.id));
+
+  if (!user.isAdmin) {
+    if (usage.count + 1 > user.quotaMaxServers)
+      return { error: `Quota atteint : ${user.quotaMaxServers} serveur(s) max.` };
+    if (usage.memoryMi + res.memoryMi > user.quotaMemoryMi)
+      return { error: `Quota RAM dépassé (${user.quotaMemoryMi} Mio au total).` };
+    if (usage.cpuMilli + res.cpuMilli > user.quotaCpuMilli)
+      return { error: `Quota CPU dépassé (${user.quotaCpuMilli} millicœurs au total).` };
+    if (usage.diskGi + res.diskGi > user.quotaDiskGi)
+      return { error: `Quota disque dépassé (${user.quotaDiskGi} Gio au total).` };
+  }
+
+  const used = await database
+    .select({ hostPort: schema.servers.hostPort })
+    .from(schema.servers);
+  const usedPorts = new Set(used.map((r) => r.hostPort));
+  for (let p = HOST_PORT_MIN; p <= HOST_PORT_MAX; p++) {
+    if (!usedPorts.has(p)) return { hostPort: p };
+  }
+  return { error: "Plus aucun port disponible sur la plage dédiée." };
+}
+
 export async function createServer(
   _prev: ServerFormState,
   formData: FormData,
@@ -84,43 +128,9 @@ export async function createServer(
 
   const database = db();
 
-  // Quotas : total des ressources des serveurs existants + le nouveau.
-  const [usage] = await database
-    .select({
-      count: sql<number>`count(*)::int`,
-      memoryMi: sql<number>`coalesce(sum(${schema.servers.memoryMi}), 0)::int`,
-      cpuMilli: sql<number>`coalesce(sum(${schema.servers.cpuMilli}), 0)::int`,
-      diskGi: sql<number>`coalesce(sum(${schema.servers.diskGi}), 0)::int`,
-    })
-    .from(schema.servers)
-    .where(eq(schema.servers.ownerId, user.id));
-
-  if (!user.isAdmin) {
-    if (usage.count + 1 > user.quotaMaxServers)
-      return { error: `Quota atteint : ${user.quotaMaxServers} serveur(s) max.` };
-    if (usage.memoryMi + input.memoryMi > user.quotaMemoryMi)
-      return { error: `Quota RAM dépassé (${user.quotaMemoryMi} Mio au total).` };
-    if (usage.cpuMilli + input.cpuMilli > user.quotaCpuMilli)
-      return { error: `Quota CPU dépassé (${user.quotaCpuMilli} millicœurs au total).` };
-    if (usage.diskGi + input.diskGi > user.quotaDiskGi)
-      return { error: `Quota disque dépassé (${user.quotaDiskGi} Gio au total).` };
-  }
-
-  // Allocation de port : premier libre de la plage.
-  const used = await database
-    .select({ hostPort: schema.servers.hostPort })
-    .from(schema.servers);
-  const usedPorts = new Set(used.map((r) => r.hostPort));
-  let hostPort: number | null = null;
-  for (let p = HOST_PORT_MIN; p <= HOST_PORT_MAX; p++) {
-    if (!usedPorts.has(p)) {
-      hostPort = p;
-      break;
-    }
-  }
-  if (hostPort === null) {
-    return { error: "Plus aucun port disponible sur la plage dédiée." };
-  }
+  const slot = await reserveSlot(user, input);
+  if ("error" in slot) return { error: slot.error };
+  const hostPort = slot.hostPort;
 
   const [server] = await database
     .insert(schema.servers)
@@ -136,6 +146,87 @@ export async function createServer(
       cpuMilli: input.cpuMilli,
       memoryMi: input.memoryMi,
       diskGi: input.diskGi,
+      desiredState: "stopped",
+    })
+    .returning();
+
+  await applyServer(server);
+  revalidatePath("/servers");
+  redirect(`/servers/${server.id}`);
+}
+
+const fromEggSchema = z.object({
+  eggId: z.string().uuid(),
+  name: z.string().trim().min(3, "Nom : 3 caractères minimum").max(48),
+  image: z.string().trim().min(3).max(255),
+  containerPort: z.coerce.number().int().min(1).max(65535).default(25565),
+  cpuMilli: z.coerce.number().int().min(250).max(16000),
+  memoryMi: z.coerce.number().int().min(256).max(32768),
+  diskGi: z.coerce.number().int().min(1).max(200),
+});
+
+/** Crée un serveur à partir d'un egg (template) : variables saisies + variante d'image. */
+export async function createServerFromEgg(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  if (!user.canCreateServers && !user.isAdmin) {
+    return { error: "Tu n'as pas le droit de créer des serveurs." };
+  }
+
+  const parsed = fromEggSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const input = parsed.data;
+
+  const [egg] = await db()
+    .select()
+    .from(schema.eggs)
+    .where(eq(schema.eggs.id, input.eggId))
+    .limit(1);
+  if (!egg) return { error: "Template introuvable." };
+
+  // La variante d'image choisie doit appartenir à l'egg.
+  const allowedImages = Object.values(egg.dockerImages);
+  if (!allowedImages.includes(input.image)) {
+    return { error: "Image non autorisée pour ce template." };
+  }
+
+  // Valeurs des variables : champ `var_<envVariable>` pour les modifiables.
+  const submitted: Record<string, string> = {};
+  for (const v of egg.variables) {
+    const raw = formData.get(`var_${v.envVariable}`);
+    if (typeof raw === "string") submitted[v.envVariable] = raw.trim();
+  }
+  const env = resolveEnv(
+    egg.variables,
+    submitted,
+    builtinVars({ memoryMi: input.memoryMi, containerPort: input.containerPort }),
+  );
+
+  const slot = await reserveSlot(user, input);
+  if ("error" in slot) return { error: slot.error };
+
+  const [server] = await db()
+    .insert(schema.servers)
+    .values({
+      ownerId: user.id,
+      name: input.name,
+      slug: slugify(input.name),
+      image: input.image,
+      env,
+      hostPort: slot.hostPort,
+      containerPort: input.containerPort,
+      cpuMilli: input.cpuMilli,
+      memoryMi: input.memoryMi,
+      diskGi: input.diskGi,
+      eggId: egg.id,
+      startup: egg.startup,
+      stopCommand: egg.stopCommand,
+      installScript: egg.installScript,
+      installContainer: egg.installContainer,
+      installEntrypoint: egg.installEntrypoint,
+      mountPath: EGG_MOUNT_PATH,
       desiredState: "stopped",
     })
     .returning();

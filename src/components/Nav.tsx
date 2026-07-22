@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Boxes,
   Cog,
+  Egg,
   Gamepad2,
   Layers,
   LayoutDashboard,
@@ -110,6 +111,12 @@ export function Nav({ user }: { user: NavUser }) {
                 label="Utilisateurs"
                 icon={Users}
                 active={isActive(pathname, "/admin/users")}
+              />
+              <SidebarLink
+                href="/eggs"
+                label="Templates (eggs)"
+                icon={Egg}
+                active={isActive(pathname, "/eggs")}
               />
             </>
           )}

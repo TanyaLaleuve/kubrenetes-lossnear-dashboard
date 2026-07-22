@@ -1,7 +1,18 @@
 import "server-only";
-import type { V1Pod, V1Service, V1StatefulSet } from "@kubernetes/client-node";
+import type {
+  V1Container,
+  V1Pod,
+  V1Service,
+  V1StatefulSet,
+} from "@kubernetes/client-node";
 import { appsApi, coreApi } from "@/lib/k8s/client";
 import type { Server } from "@/lib/db/schema";
+import { builtinVars, substituteVars } from "./eggs";
+
+/** Marqueur écrit après une install réussie : évite de rejouer le script. */
+const INSTALL_MARKER = ".lossnear-installed";
+/** Où l'initContainer d'install monte le volume (façon Pterodactyl). */
+const INSTALL_MOUNT = "/mnt/server";
 
 export const SERVERS_NAMESPACE = "lossnear-servers";
 export const HOST_PORT_MIN = 25600;
@@ -15,7 +26,91 @@ function labels(server: Server) {
   };
 }
 
+/** Variables d'environnement du conteneur (env serveur + variables intégrées). */
+function serverEnvVars(server: Server): Record<string, string> {
+  return {
+    ...builtinVars({
+      memoryMi: server.memoryMi,
+      containerPort: server.containerPort,
+    }),
+    ...server.env,
+  };
+}
+
+/**
+ * initContainer d'installation (serveurs egg) : monte le volume sur
+ * /mnt/server et joue le script une seule fois, protégé par un marqueur.
+ */
+function buildInstallContainer(server: Server): V1Container | null {
+  if (!server.startup || !server.installScript) return null;
+  const vars = serverEnvVars(server);
+  // Le script d'install de l'egg peut référencer {{VAR}} : on substitue avant.
+  const script = substituteVars(server.installScript, vars);
+  const marker = `${INSTALL_MOUNT}/${INSTALL_MARKER}`;
+  const wrapped = [
+    `if [ -f '${marker}' ]; then echo '[install] deja installe, skip'; exit 0; fi`,
+    "set -e",
+    "echo '[install] demarrage du script...'",
+    script,
+    `touch '${marker}'`,
+    "echo '[install] termine.'",
+  ].join("\n");
+
+  return {
+    name: "install",
+    image: server.installContainer || "debian:bookworm-slim",
+    command: [server.installEntrypoint || "bash", "-c", wrapped],
+    workingDir: INSTALL_MOUNT,
+    env: Object.entries(vars).map(([name, value]) => ({ name, value })),
+    volumeMounts: [{ name: "data", mountPath: INSTALL_MOUNT }],
+  };
+}
+
+/** Conteneur principal du serveur. */
+function buildMainContainer(server: Server): V1Container {
+  const vars = serverEnvVars(server);
+  return {
+    name: "server",
+    image: server.image,
+    // Serveur egg : commande shell (startup) avec substitution {{VAR}}.
+    // Serveur image libre : args optionnels (`command`), sinon entrypoint image.
+    ...(server.startup
+      ? { command: ["/bin/sh", "-c", substituteVars(server.startup, vars)] }
+      : server.command
+        ? { args: server.command.split(/\s+/).filter(Boolean) }
+        : {}),
+    workingDir: server.mountPath,
+    env: Object.entries(vars).map(([name, value]) => ({ name, value })),
+    // stdin ouvert pour l'envoi de commandes (attach), mais SANS
+    // pseudo-terminal : avec un tty, Minecraft dessine des barres de
+    // progression ANSI qui polluent la console. Sans tty, il écrit
+    // des logs texte propres.
+    stdin: true,
+    tty: false,
+    ports: [
+      {
+        name: "game",
+        containerPort: server.containerPort,
+        hostPort: server.hostPort,
+        protocol: "TCP",
+      },
+    ],
+    volumeMounts: [{ name: "data", mountPath: server.mountPath }],
+    resources: {
+      requests: {
+        cpu: `${Math.max(100, Math.floor(server.cpuMilli / 2))}m`,
+        memory: `${server.memoryMi}Mi`,
+      },
+      limits: {
+        cpu: `${server.cpuMilli}m`,
+        memory: `${server.memoryMi}Mi`,
+      },
+    },
+  };
+}
+
 function buildStatefulSet(server: Server): V1StatefulSet {
+  const installContainer = buildInstallContainer(server);
   return {
     apiVersion: "apps/v1",
     kind: "StatefulSet",
@@ -35,44 +130,8 @@ function buildStatefulSet(server: Server): V1StatefulSet {
           // (l'image Minecraft ignore SIGTERM pendant la génération du monde).
           // Pour un arrêt instantané, utiliser Kill (grace period 0).
           terminationGracePeriodSeconds: 30,
-          containers: [
-            {
-              name: "server",
-              image: server.image,
-              ...(server.command
-                ? { args: server.command.split(/\s+/).filter(Boolean) }
-                : {}),
-              env: Object.entries(server.env).map(([name, value]) => ({
-                name,
-                value,
-              })),
-              // stdin ouvert pour l'envoi de commandes (attach), mais SANS
-              // pseudo-terminal : avec un tty, Minecraft dessine des barres de
-              // progression ANSI qui polluent la console. Sans tty, il écrit
-              // des logs texte propres.
-              stdin: true,
-              tty: false,
-              ports: [
-                {
-                  name: "game",
-                  containerPort: server.containerPort,
-                  hostPort: server.hostPort,
-                  protocol: "TCP",
-                },
-              ],
-              volumeMounts: [{ name: "data", mountPath: "/data" }],
-              resources: {
-                requests: {
-                  cpu: `${Math.max(100, Math.floor(server.cpuMilli / 2))}m`,
-                  memory: `${server.memoryMi}Mi`,
-                },
-                limits: {
-                  cpu: `${server.cpuMilli}m`,
-                  memory: `${server.memoryMi}Mi`,
-                },
-              },
-            },
-          ],
+          ...(installContainer ? { initContainers: [installContainer] } : {}),
+          containers: [buildMainContainer(server)],
         },
       },
       volumeClaimTemplates: [
