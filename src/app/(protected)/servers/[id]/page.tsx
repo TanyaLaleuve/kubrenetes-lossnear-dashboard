@@ -55,7 +55,15 @@ export default async function ServerDetailPage({
     can("control.stop") ||
     can("control.restart") ||
     can("control.kill");
-  const canAnyManage = can("files.read") || can("members.read") || privileged;
+  // Paramètres : visible seulement si quelque chose y est réellement
+  // modifiable (members.read seul n'ouvre qu'une vue lecture -> ne compte pas).
+  const canModifySettings =
+    privileged ||
+    can("settings.general") ||
+    can("settings.egg") ||
+    can("settings.manage") ||
+    can("members.manage");
+  const canAnyManage = can("files.read") || can("members.read") || canModifySettings;
 
   const status = await serverRuntimeStatus(server).catch(() => ({
     label: "Error" as const,
@@ -168,7 +176,7 @@ export default async function ServerDetailPage({
               Permissions
             </Link>
           )}
-          {privileged && (
+          {canModifySettings && (
             <Link
               href={`/servers/${server.id}/settings`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
