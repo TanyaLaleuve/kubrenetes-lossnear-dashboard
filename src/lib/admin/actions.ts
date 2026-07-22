@@ -1,7 +1,7 @@
 "use server";
 
 import { hash } from "bcryptjs";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -163,26 +163,28 @@ export async function adminSetPassword(
 }
 
 /**
- * Supprime un compte (admin). Refuse si le compte possède des serveurs
- * (leurs objets Kubernetes seraient orphelins) : il faut d'abord les
- * supprimer ou les transférer. Impossible sur son propre compte.
+ * Supprime un compte (admin). Détruit d'abord proprement les serveurs qu'il
+ * possède (objets Kubernetes : StatefulSet + Service + volume) pour ne rien
+ * laisser d'orphelin, puis supprime le compte (la cascade DB retire les lignes
+ * serveurs et les invitations). Impossible sur son propre compte.
  */
 export async function deleteUser(userId: string) {
   const admin = await currentUser();
   if (!admin.isAdmin) throw new Error("Réservé aux admins.");
   if (userId === admin.id) throw new Error("Impossible de supprimer son propre compte.");
 
-  const [owned] = await db()
-    .select({ count: sql<number>`count(*)::int` })
+  // Nettoyage Kubernetes de chaque serveur possédé avant la suppression DB.
+  const owned = await db()
+    .select()
     .from(schema.servers)
     .where(eq(schema.servers.ownerId, userId));
-  if (owned.count > 0) {
-    throw new Error(
-      "Ce compte possède des serveurs. Supprime-les ou transfère-les d'abord.",
-    );
+  const { destroyServer } = await import("@/lib/servers/k8s");
+  for (const server of owned) {
+    await destroyServer(server).catch(() => null);
   }
 
   await db().delete(schema.users).where(eq(schema.users.id, userId));
   revalidatePath("/admin/users");
+  revalidatePath("/servers");
   redirect("/admin/users");
 }

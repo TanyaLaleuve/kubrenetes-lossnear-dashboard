@@ -108,28 +108,33 @@ export default async function AdminUserDetailPage({
             <h2 className="text-sm font-semibold text-destructive">
               Supprimer le compte
             </h2>
-            {user.serverCount > 0 ? (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Ce compte possède {user.serverCount} serveur
-                {user.serverCount > 1 ? "s" : ""}. Supprime-les ou transfère-les
-                d&apos;abord (leur propriétaire ne peut pas être supprimé tant
-                qu&apos;il possède des serveurs).
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Action irréversible. Les invitations de ce compte sur
+                d&apos;autres serveurs sont retirées.
+                {user.serverCount > 0 && (
+                  <>
+                    {" "}
+                    <span className="font-medium text-destructive">
+                      Ses {user.serverCount} serveur
+                      {user.serverCount > 1 ? "s" : ""} et leurs données seront
+                      aussi définitivement supprimés.
+                    </span>
+                  </>
+                )}
               </p>
-            ) : (
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Action irréversible. Les invitations de ce compte sur
-                  d&apos;autres serveurs sont retirées.
-                </p>
-                <ConfirmButton
-                  action={deleteUser.bind(null, user.id)}
-                  confirmLabel="Oui, supprimer le compte"
-                >
-                  <Trash2 className="size-4 mr-1.5" />
-                  Supprimer le compte
-                </ConfirmButton>
-              </div>
-            )}
+              <ConfirmButton
+                action={deleteUser.bind(null, user.id)}
+                confirmLabel={
+                  user.serverCount > 0
+                    ? "Oui, supprimer compte + serveurs"
+                    : "Oui, supprimer le compte"
+                }
+              >
+                <Trash2 className="size-4 mr-1.5" />
+                Supprimer le compte
+              </ConfirmButton>
+            </div>
           </div>
         </div>
       )}
