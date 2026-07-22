@@ -20,9 +20,8 @@ export type SafeUser = {
   quotaMemoryMi: number;
   quotaCpuMilli: number;
   quotaDiskGi: number;
-  /** Plage de ports externes allouée (null = plage globale par défaut). */
-  portRangeStart: number | null;
-  portRangeEnd: number | null;
+  /** Ports externes autorisés (spec brute) ; null = plage globale par défaut. */
+  portAllowlist: string | null;
   /** Epoch ms de la dernière modification — sert de cache-buster avatar. */
   updatedAt: number;
 };
@@ -47,8 +46,7 @@ export async function sessionUser(): Promise<SafeUser | null> {
       quotaMemoryMi: schema.users.quotaMemoryMi,
       quotaCpuMilli: schema.users.quotaCpuMilli,
       quotaDiskGi: schema.users.quotaDiskGi,
-      portRangeStart: schema.users.portRangeStart,
-      portRangeEnd: schema.users.portRangeEnd,
+      portAllowlist: schema.users.portAllowlist,
       updatedAt: schema.users.updatedAt,
     })
     .from(schema.users)
@@ -71,8 +69,7 @@ export async function sessionUser(): Promise<SafeUser | null> {
     quotaMemoryMi: user.quotaMemoryMi,
     quotaCpuMilli: user.quotaCpuMilli,
     quotaDiskGi: user.quotaDiskGi,
-    portRangeStart: user.portRangeStart,
-    portRangeEnd: user.portRangeEnd,
+    portAllowlist: user.portAllowlist,
     updatedAt: user.updatedAt.valueOf(),
   };
 }

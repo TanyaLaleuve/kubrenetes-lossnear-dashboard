@@ -19,8 +19,7 @@ export function UserGrantsForm({
     quotaMemoryMi: number;
     quotaCpuMilli: number;
     quotaDiskGi: number;
-    portRangeStart: number | null;
-    portRangeEnd: number | null;
+    portAllowlist: string | null;
   };
 }) {
   const [state, action, pending] = useActionState(updateUserGrants, initialState);
@@ -94,35 +93,21 @@ export function UserGrantsForm({
           />
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <label className="space-y-1 text-xs text-muted-foreground">
-          Port ext. min
-          <input
-            name="portRangeStart"
-            type="number"
-            min={25600}
-            max={25699}
-            placeholder="auto"
-            defaultValue={user.portRangeStart ?? ""}
-            className={inputClass}
-          />
-        </label>
-        <label className="space-y-1 text-xs text-muted-foreground">
-          Port ext. max
-          <input
-            name="portRangeEnd"
-            type="number"
-            min={25600}
-            max={25699}
-            placeholder="auto"
-            defaultValue={user.portRangeEnd ?? ""}
-            className={inputClass}
-          />
-        </label>
-        <p className="col-span-2 self-center text-[11px] text-muted-foreground">
-          Plage de ports allouée (25600-25699). Vide = plage globale.
-        </p>
-      </div>
+      <label className="block space-y-1 text-xs text-muted-foreground">
+        Ports externes autorisés
+        <input
+          name="portAllowlist"
+          type="text"
+          data-keep-empty
+          placeholder="ex. 25601, 25605, 25610-25615"
+          defaultValue={user.portAllowlist ?? ""}
+          className={`${inputClass} font-mono`}
+        />
+        <span className="block text-[11px] text-muted-foreground">
+          Ports et plages séparés par des virgules (25600-25699). Vide = plage
+          globale complète.
+        </span>
+      </label>
       {state.error && (
         <p role="alert" className="text-sm text-destructive">
           {state.error}

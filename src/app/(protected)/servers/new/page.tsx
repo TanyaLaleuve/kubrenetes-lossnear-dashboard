@@ -6,7 +6,7 @@ import { ServerCreateForm } from "@/components/ServerCreateForm";
 import { EggServerForm } from "@/components/EggServerForm";
 import { requireView } from "@/lib/auth/user";
 import { canChoosePort } from "@/lib/auth/dashboard-permissions";
-import { userPortRange } from "@/lib/servers/ports";
+import { portsLabel, userPortBounds } from "@/lib/servers/ports";
 import { db, schema } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -33,12 +33,13 @@ export default async function NewServerPage({
         maxDiskGi: user.quotaDiskGi,
       };
 
-  // Choix du port externe : permission + plage allouée.
-  const range = userPortRange(user);
+  // Choix du port externe : permission + ports alloués.
+  const bounds = userPortBounds(user);
   const portProps = {
     canChoosePort: canChoosePort(user),
-    portMin: range.min,
-    portMax: range.max,
+    portMin: bounds.min,
+    portMax: bounds.max,
+    portsLabel: portsLabel(user),
   };
 
   function Header({ subtitle, back }: { subtitle: string; back: string }) {

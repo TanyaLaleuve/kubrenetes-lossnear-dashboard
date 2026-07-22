@@ -10,7 +10,7 @@ import { requirePrivileged, requireServerPermission } from "./authz";
 import { DEFAULT_IMAGE } from "./constants";
 import { sanitizePermissions } from "./permissions";
 import { builtinVars, EGG_MOUNT_PATH, resolveEnv } from "./eggs";
-import { userPortRange } from "./ports";
+import { parsePortSpec, userAllowedPorts } from "./ports";
 import { canChoosePort } from "@/lib/auth/dashboard-permissions";
 import {
   applyServer,
@@ -114,13 +114,13 @@ async function reserveSlot(
     .select({ hostPort: schema.servers.hostPort })
     .from(schema.servers);
   const usedPorts = new Set(used.map((r) => r.hostPort));
-  const { min, max } = userPortRange(user);
+  const allowed = userAllowedPorts(user);
 
   // Port demandé explicitement : uniquement si l'utilisateur a la permission,
-  // dans sa plage et libre. Sinon on ignore et on attribue automatiquement.
+  // qu'il est autorisé et libre. Sinon on ignore et on attribue automatiquement.
   if (desiredPort != null && canChoosePort(user)) {
-    if (desiredPort < min || desiredPort > max) {
-      return { error: `Port hors de ta plage autorisée (${min}-${max}).` };
+    if (!allowed.includes(desiredPort)) {
+      return { error: `Le port ${desiredPort} ne fait pas partie de tes ports autorisés.` };
     }
     if (usedPorts.has(desiredPort)) {
       return { error: `Le port ${desiredPort} est déjà utilisé par un autre serveur.` };
@@ -128,11 +128,11 @@ async function reserveSlot(
     return { hostPort: desiredPort };
   }
 
-  // Sinon : premier port libre de la plage allouée.
-  for (let p = min; p <= max; p++) {
+  // Sinon : premier port libre parmi les ports autorisés.
+  for (const p of allowed) {
     if (!usedPorts.has(p)) return { hostPort: p };
   }
-  return { error: `Plus aucun port disponible dans ta plage (${min}-${max}).` };
+  return { error: "Plus aucun port disponible dans ta liste allouée." };
 }
 
 export async function createServer(
@@ -434,9 +434,11 @@ export async function updateServerGeneralSettings(
   // dans sa plage, et libre. Sinon on garde le port actuel.
   let newHostPort = server.hostPort;
   if (canChoosePort(user)) {
-    const { min, max } = userPortRange(user);
-    if (input.hostPort < min || input.hostPort > max) {
-      return { error: `Port hors de ta plage autorisée (${min}-${max}).` };
+    const allowed = userAllowedPorts(user);
+    // On tolère le port actuel même s'il n'est plus dans la liste (allocation
+    // modifiée après coup) ; sinon il doit faire partie des ports autorisés.
+    if (input.hostPort !== server.hostPort && !allowed.includes(input.hostPort)) {
+      return { error: `Le port ${input.hostPort} ne fait pas partie de tes ports autorisés.` };
     }
     if (input.hostPort !== server.hostPort) {
       const clash = await db()
@@ -696,8 +698,7 @@ const quotaSchema = z.object({
   quotaMemoryMi: z.coerce.number().int().min(0).max(262144),
   quotaCpuMilli: z.coerce.number().int().min(0).max(64000),
   quotaDiskGi: z.coerce.number().int().min(0).max(2000),
-  portRangeStart: optionalHostPort(),
-  portRangeEnd: optionalHostPort(),
+  portAllowlist: z.string().trim().max(500).optional(),
 });
 
 export async function updateUserGrants(
@@ -715,17 +716,20 @@ export async function updateUserGrants(
     quotaMemoryMi: formData.get("quotaMemoryMi"),
     quotaCpuMilli: formData.get("quotaCpuMilli"),
     quotaDiskGi: formData.get("quotaDiskGi"),
-    portRangeStart: formData.get("portRangeStart"),
-    portRangeEnd: formData.get("portRangeEnd"),
+    portAllowlist: formData.get("portAllowlist"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  const { portRangeStart, portRangeEnd } = parsed.data;
-  if ((portRangeStart == null) !== (portRangeEnd == null)) {
-    return { error: "Plage de ports : renseigne les deux bornes ou aucune." };
-  }
-  if (portRangeStart != null && portRangeEnd != null && portRangeStart > portRangeEnd) {
-    return { error: "Plage de ports : le début doit être ≤ la fin." };
+  // Ports autorisés : on valide la syntaxe et on normalise (ou null si vide).
+  let portAllowlist: string | null = null;
+  const spec = parsed.data.portAllowlist?.trim();
+  if (spec) {
+    try {
+      parsePortSpec(spec); // valide la syntaxe et les bornes
+      portAllowlist = spec;
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Liste de ports invalide." };
+    }
   }
 
   // Un admin ne peut pas modifier son propre compte ici (protection anti-lockout).
@@ -738,8 +742,7 @@ export async function updateUserGrants(
       quotaMemoryMi: parsed.data.quotaMemoryMi,
       quotaCpuMilli: parsed.data.quotaCpuMilli,
       quotaDiskGi: parsed.data.quotaDiskGi,
-      portRangeStart: portRangeStart ?? null,
-      portRangeEnd: portRangeEnd ?? null,
+      portAllowlist,
       updatedAt: new Date(),
     })
     .where(

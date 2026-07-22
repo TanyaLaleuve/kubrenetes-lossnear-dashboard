@@ -18,6 +18,7 @@ export function ServerCreateForm({
   canChoosePort,
   portMin,
   portMax,
+  portsLabel,
 }: {
   maxMemoryMi: number;
   maxCpuMilli: number;
@@ -25,6 +26,7 @@ export function ServerCreateForm({
   canChoosePort: boolean;
   portMin: number;
   portMax: number;
+  portsLabel: string;
 }) {
   const [state, action, pending] = useActionState(createServer, initialState);
   const [envRows, setEnvRows] = useState<EnvRow[]>([
@@ -170,8 +172,8 @@ export function ServerCreateForm({
       </fieldset>
       {canChoosePort && (
         <p className="-mt-2 text-xs text-muted-foreground">
-          Port externe : laisser vide = attribué automatiquement (plage{" "}
-          {portMin}-{portMax}).
+          Port externe : laisser vide = attribué automatiquement. Autorisés :{" "}
+          {portsLabel}.
         </p>
       )}
 

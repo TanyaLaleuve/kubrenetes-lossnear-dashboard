@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ServerGeneralForm } from "@/components/ServerGeneralForm";
 import { currentUser } from "@/lib/auth/user";
 import { canChoosePort } from "@/lib/auth/dashboard-permissions";
-import { userPortRange } from "@/lib/servers/ports";
+import { portsLabel, userPortBounds } from "@/lib/servers/ports";
 import { db, schema } from "@/lib/db";
 import { serverAccess } from "@/lib/servers/authz";
 
@@ -27,7 +27,7 @@ export default async function ServerSettingsGeneralPage({
     .from(schema.users)
     .orderBy(asc(schema.users.username));
 
-  const range = userPortRange(user);
+  const bounds = userPortBounds(user);
 
   return (
     <div className="space-y-6">
@@ -36,8 +36,9 @@ export default async function ServerSettingsGeneralPage({
         users={usersList}
         isPrivileged={access.privileged}
         canChoosePort={canChoosePort(user)}
-        portMin={range.min}
-        portMax={range.max}
+        portMin={bounds.min}
+        portMax={bounds.max}
+        portsLabel={portsLabel(user)}
       />
     </div>
   );

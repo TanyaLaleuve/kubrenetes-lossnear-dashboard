@@ -26,6 +26,7 @@ export function EggServerForm({
   canChoosePort,
   portMin,
   portMax,
+  portsLabel,
 }: {
   egg: EggLite;
   maxMemoryMi: number;
@@ -34,6 +35,7 @@ export function EggServerForm({
   canChoosePort: boolean;
   portMin: number;
   portMax: number;
+  portsLabel: string;
 }) {
   const [state, action, pending] = useActionState(
     createServerFromEgg,
@@ -194,8 +196,8 @@ export function EggServerForm({
       </fieldset>
       {canChoosePort && (
         <p className="-mt-2 text-xs text-muted-foreground">
-          Port externe : vide = attribué automatiquement (plage {portMin}-
-          {portMax}).
+          Port externe : vide = attribué automatiquement. Autorisés :{" "}
+          {portsLabel}.
         </p>
       )}
 

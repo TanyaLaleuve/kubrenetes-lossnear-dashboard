@@ -17,6 +17,7 @@ export function ServerGeneralForm({
   canChoosePort,
   portMin,
   portMax,
+  portsLabel,
 }: {
   server: ServerType;
   users: UserItem[];
@@ -24,6 +25,7 @@ export function ServerGeneralForm({
   canChoosePort: boolean;
   portMin: number;
   portMax: number;
+  portsLabel: string;
 }) {
   const [state, formAction, pending] = useActionState<ServerFormState, FormData>(
     updateServerGeneralSettings,
@@ -165,7 +167,7 @@ export function ServerGeneralForm({
           />
           <p className="text-[11px] text-muted-foreground">
             {canChoosePort
-              ? `Port public de connexion (plage ${portMin}-${portMax}). Doit être libre.`
+              ? `Port public de connexion. Autorisés : ${portsLabel}. Doit être libre.`
               : "Attribué automatiquement — tu n'as pas la permission de le changer."}
           </p>
         </div>

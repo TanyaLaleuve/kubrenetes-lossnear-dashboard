@@ -64,6 +64,20 @@
       "when": 1784742688373,
       "tag": "0008_user_port_range",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784743285829,
+      "tag": "0009_drop_port_range",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784743305860,
+      "tag": "0010_add_port_allowlist",
+      "breakpoints": true
     }
   ]
 }
