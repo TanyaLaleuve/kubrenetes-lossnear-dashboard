@@ -646,41 +646,41 @@ export async function createSubUser(
   if (!parsed.success) return { error: parsed.error.issues[0].message };
   const input = parsed.data;
 
-  const database = db();
-  let created: { id: string };
+  const passwordHash = await hash(input.password, 12);
+
+  // Transaction : le compte ne doit jamais exister sans être ajouté au
+  // serveur (sinon on obtient un compte fantôme, non rattaché à rien).
   try {
-    const rows = await database
-      .insert(schema.users)
-      .values({
-        username: input.username,
-        passwordHash: await hash(input.password, 12),
-        origin: "k8s",
-        parentUserId: user.id,
-        isAdmin: false,
-        canCreateServers: false,
-        permissions: sanitizeDashboardPermissions(DEFAULT_DASHBOARD_PERMISSIONS),
-        quotaMaxServers: 0,
-        quotaMemoryMi: 0,
-        quotaCpuMilli: 0,
-        quotaDiskGi: 0,
-      })
-      .returning({ id: schema.users.id });
-    created = rows[0];
+    await db().transaction(async (tx) => {
+      const [created] = await tx
+        .insert(schema.users)
+        .values({
+          username: input.username,
+          passwordHash,
+          origin: "k8s",
+          parentUserId: user.id,
+          isAdmin: false,
+          canCreateServers: false,
+          permissions: sanitizeDashboardPermissions(DEFAULT_DASHBOARD_PERMISSIONS),
+          quotaMaxServers: 0,
+          quotaMemoryMi: 0,
+          quotaCpuMilli: 0,
+          quotaDiskGi: 0,
+        })
+        .returning({ id: schema.users.id });
+
+      await tx.insert(schema.serverMembers).values({
+        serverId,
+        userId: created.id,
+        permissions: sanitizePermissions(DEFAULT_MEMBER_PERMISSIONS),
+      });
+    });
   } catch (error) {
     if (isUniqueViolation(error)) {
       return { error: "Nom d'utilisateur déjà pris." };
     }
     throw error;
   }
-
-  await database
-    .insert(schema.serverMembers)
-    .values({
-      serverId,
-      userId: created.id,
-      permissions: sanitizePermissions(DEFAULT_MEMBER_PERMISSIONS),
-    })
-    .onConflictDoNothing();
 
   revalidatePath(`/servers/${serverId}/members`);
   return { success: `Compte « ${input.username} » créé et ajouté au serveur.` };
