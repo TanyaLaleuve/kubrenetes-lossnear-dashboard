@@ -48,7 +48,7 @@ export function SettingsNav({ serverId }: { serverId: string }) {
             href={tab.href}
             className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors duration-150 ${
               active
-                ? "bg-accent/15 text-accent-light font-semibold border border-accent/20"
+                ? "bg-accent/15 text-accent font-semibold border border-accent/20"
                 : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
             }`}
           >

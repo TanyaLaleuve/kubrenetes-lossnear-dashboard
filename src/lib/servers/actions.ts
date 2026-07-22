@@ -14,6 +14,7 @@ import {
   applyServer,
   destroyServer,
   forceDeletePod,
+  updateServerWorkload,
   HOST_PORT_MAX,
   HOST_PORT_MIN,
   SERVERS_NAMESPACE,
@@ -392,12 +393,19 @@ export async function updateServerGeneralSettings(
   }
   const input = parsed.data;
 
+  // La taille du disque est immuable après création (volumeClaimTemplates K8s).
+  if (input.diskGi !== server.diskGi) {
+    return {
+      error:
+        "La taille du disque ne peut pas être modifiée après la création du serveur.",
+    };
+  }
+
   const updateData: Record<string, unknown> = {
     name: input.name,
     containerPort: input.containerPort,
     cpuMilli: input.cpuMilli,
     memoryMi: input.memoryMi,
-    diskGi: input.diskGi,
     displayAddress: input.displayAddress || null,
     updatedAt: new Date(),
   };
@@ -419,7 +427,7 @@ export async function updateServerGeneralSettings(
     .where(eq(schema.servers.id, server.id))
     .returning();
 
-  await applyServer(updated);
+  await updateServerWorkload(updated);
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings`);
   revalidatePath("/servers");
@@ -475,7 +483,7 @@ export async function updateServerEggSettings(
     .where(eq(schema.servers.id, server.id))
     .returning();
 
-  await applyServer(updated);
+  await updateServerWorkload(updated);
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings/egg`);
   return {};
@@ -499,9 +507,10 @@ export async function migrateServerAction(
     .where(eq(schema.servers.id, server.id))
     .returning();
 
-  await applyServer(updated);
+  // nodeName est dans le template du pod : on remplace la spec du StatefulSet.
+  await updateServerWorkload(updated);
 
-  // Forcer le redémarrage du pod si le serveur est en cours d'exécution pour déplacer le conteneur
+  // Forcer le redémarrage du pod si le serveur tourne pour déplacer le conteneur.
   if (server.desiredState === "running") {
     await forceDeletePod(server.slug);
   }
@@ -525,7 +534,7 @@ export async function reinstallServerAction(
     const { resolveVolumeDir, agentFetch } = await import("./files");
     const vol = await resolveVolumeDir(server.slug);
     if (vol) {
-      await agentFetch("/api/files/delete", vol, ".lossnear-installed", {
+      await agentFetch("/files/delete", vol, ".lossnear-installed", {
         method: "POST",
       }).catch(() => null);
     }

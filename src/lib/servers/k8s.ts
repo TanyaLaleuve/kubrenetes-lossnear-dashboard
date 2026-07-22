@@ -192,23 +192,14 @@ export async function applyServer(server: Server): Promise<void> {
 
   const replicas = server.desiredState === "running" ? 1 : 0;
   try {
-    const existing = await apps.readNamespacedStatefulSet({
+    await apps.readNamespacedStatefulSet({
       namespace: SERVERS_NAMESPACE,
       name: server.slug,
     });
-    // Mise à jour de la spec du StatefulSet pour refléter toute modification de config (RAM, CPU, Image, Node, Env)
-    const updatedBody = buildStatefulSet(server);
-    if (existing.metadata?.resourceVersion) {
-      updatedBody.metadata = {
-        ...updatedBody.metadata,
-        resourceVersion: existing.metadata.resourceVersion,
-      };
-    }
-    await apps.replaceNamespacedStatefulSet({
-      namespace: SERVERS_NAMESPACE,
-      name: server.slug,
-      body: updatedBody,
-    });
+    // StatefulSet déjà présent : on ne touche qu'au nombre de replicas via le
+    // sous-objet scale (fiable et sans conflit), pas de remplacement complet.
+    // Les changements de config passent par updateServerWorkload().
+    await setReplicas(server.slug, replicas);
   } catch (error) {
     if (!(await isNotFound(error))) throw error;
     await apps.createNamespacedStatefulSet({
@@ -216,6 +207,63 @@ export async function applyServer(server: Server): Promise<void> {
       body: buildStatefulSet(server),
     });
   }
+}
+
+/**
+ * Applique un changement de configuration (RAM, CPU, image, env, startup,
+ * nœud, port) en remplaçant la spec du StatefulSet. Le volume (disque) est
+ * immuable côté Kubernetes : on conserve le volumeClaimTemplates existant.
+ * Le contrôleur recrée le pod-0 si le serveur tourne (redémarrage bref).
+ */
+export async function updateServerWorkload(server: Server): Promise<void> {
+  const apps = appsApi();
+  const core = coreApi();
+
+  // Service headless : créé s'il manque.
+  try {
+    await core.readNamespacedService({
+      namespace: SERVERS_NAMESPACE,
+      name: server.slug,
+    });
+  } catch (error) {
+    if (!(await isNotFound(error))) throw error;
+    await core.createNamespacedService({
+      namespace: SERVERS_NAMESPACE,
+      body: buildHeadlessService(server),
+    });
+  }
+
+  let existing;
+  try {
+    existing = await apps.readNamespacedStatefulSet({
+      namespace: SERVERS_NAMESPACE,
+      name: server.slug,
+    });
+  } catch (error) {
+    if (!(await isNotFound(error))) throw error;
+    // Jamais créé : création simple.
+    await apps.createNamespacedStatefulSet({
+      namespace: SERVERS_NAMESPACE,
+      body: buildStatefulSet(server),
+    });
+    return;
+  }
+
+  const body = buildStatefulSet(server);
+  // volumeClaimTemplates est immuable : on garde celui déjà en place pour ne
+  // pas déclencher une erreur de validation (la taille disque ne change pas ici).
+  if (body.spec) {
+    body.spec.volumeClaimTemplates = existing.spec?.volumeClaimTemplates;
+  }
+  body.metadata = {
+    ...body.metadata,
+    resourceVersion: existing.metadata?.resourceVersion,
+  };
+  await apps.replaceNamespacedStatefulSet({
+    namespace: SERVERS_NAMESPACE,
+    name: server.slug,
+    body,
+  });
 }
 
 /** Ajuste le nombre de replicas (start/stop) via le sous-objet scale. */

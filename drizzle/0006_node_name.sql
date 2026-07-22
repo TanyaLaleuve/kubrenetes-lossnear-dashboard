@@ -1,0 +1,1 @@
+ALTER TABLE "servers" ADD COLUMN "node_name" varchar(255);

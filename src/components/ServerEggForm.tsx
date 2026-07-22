@@ -109,7 +109,7 @@ export function ServerEggForm({
         {startup && (
           <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-1">
             <span className="text-[11px] font-semibold text-muted-foreground">Aperçu résolu de la commande :</span>
-            <p className="font-mono text-xs text-accent-light break-all">{startupPreview || "(vide)"}</p>
+            <p className="font-mono text-xs text-accent break-all">{startupPreview || "(vide)"}</p>
           </div>
         )}
       </div>

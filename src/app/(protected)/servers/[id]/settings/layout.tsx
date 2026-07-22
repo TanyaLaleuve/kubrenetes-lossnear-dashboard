@@ -19,8 +19,9 @@ export default async function ServerSettingsLayout({
   const { id } = await params;
   const user = await currentUser();
 
+  // Paramètres réservés au propriétaire et aux admins.
   const access = await serverAccess(user, id);
-  if (!access || (!access.privileged && !access.permissions.has("members.read"))) {
+  if (!access || !access.privileged) {
     redirect(`/servers/${id}`);
   }
 

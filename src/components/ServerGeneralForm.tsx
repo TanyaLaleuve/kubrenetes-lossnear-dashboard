@@ -131,9 +131,13 @@ export function ServerGeneralForm({
             max={200}
             required
             defaultValue={server.diskGi}
-            disabled={!isPrivileged}
+            disabled
+            title="La taille du disque est fixée à la création."
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
           />
+          <p className="text-[11px] text-muted-foreground">
+            Non modifiable après création (volume Kubernetes immuable).
+          </p>
         </div>
 
         {/* Port conteneur */}
