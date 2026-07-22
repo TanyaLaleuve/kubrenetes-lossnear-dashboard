@@ -1,5 +1,6 @@
 "use server";
 
+import { hash } from "bcryptjs";
 import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -8,10 +9,14 @@ import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
 import { requirePrivileged, requireServerPermission } from "./authz";
 import { DEFAULT_IMAGE } from "./constants";
-import { sanitizePermissions } from "./permissions";
+import { DEFAULT_MEMBER_PERMISSIONS, sanitizePermissions } from "./permissions";
 import { builtinVars, EGG_MOUNT_PATH, resolveEnv } from "./eggs";
 import { parsePortSpec, userAllowedPorts } from "./ports";
-import { canChoosePort } from "@/lib/auth/dashboard-permissions";
+import {
+  canChoosePort,
+  DEFAULT_DASHBOARD_PERMISSIONS,
+  sanitizeDashboardPermissions,
+} from "@/lib/auth/dashboard-permissions";
 import {
   applyServer,
   destroyServer,
@@ -22,7 +27,16 @@ import {
   SERVERS_NAMESPACE,
 } from "./k8s";
 
-export type ServerFormState = { error?: string };
+export type ServerFormState = { error?: string; success?: string };
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "23505"
+  );
+}
 
 const createSchema = z.object({
   name: z
@@ -611,6 +625,81 @@ export async function reinstallServerAction(
 }
 
 // ---- Membres d'un serveur (sous-utilisateurs) ----
+
+const createSubUserSchema = z.object({
+  serverId: z.string().uuid(),
+  username: z
+    .string()
+    .trim()
+    .min(3, "Nom d'utilisateur : 3 caractères minimum")
+    .max(32, "Nom d'utilisateur : 32 caractères maximum")
+    .regex(/^[a-zA-Z0-9_.-]+$/, "Lettres, chiffres, _ . - uniquement"),
+  password: z.string().min(12, "Mot de passe : 12 caractères minimum"),
+});
+
+/**
+ * Crée un nouveau compte (sous-utilisateur, pas d'accès admin ni de quota de
+ * création) et l'ajoute directement comme membre de ce serveur — pour
+ * inviter quelqu'un qui n'a pas encore de compte dashboard. Réservé à qui a
+ * members.manage sur le serveur. Le compte reste rattaché à son créateur
+ * (parentUserId) : base pour une future conversion en compte indépendant
+ * d'un sous-dashboard (Minecraft, bot) une fois ceux-ci construits.
+ */
+export async function createSubUser(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  await requireServerPermission(user, serverId, "members.manage");
+
+  const parsed = createSubUserSchema.safeParse({
+    serverId,
+    username: formData.get("username"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const input = parsed.data;
+
+  const database = db();
+  let created: { id: string };
+  try {
+    const rows = await database
+      .insert(schema.users)
+      .values({
+        username: input.username,
+        passwordHash: await hash(input.password, 12),
+        origin: "k8s",
+        parentUserId: user.id,
+        isAdmin: false,
+        canCreateServers: false,
+        permissions: sanitizeDashboardPermissions(DEFAULT_DASHBOARD_PERMISSIONS),
+        quotaMaxServers: 0,
+        quotaMemoryMi: 0,
+        quotaCpuMilli: 0,
+        quotaDiskGi: 0,
+      })
+      .returning({ id: schema.users.id });
+    created = rows[0];
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return { error: "Nom d'utilisateur déjà pris." };
+    }
+    throw error;
+  }
+
+  await database
+    .insert(schema.serverMembers)
+    .values({
+      serverId,
+      userId: created.id,
+      permissions: sanitizePermissions(DEFAULT_MEMBER_PERMISSIONS),
+    })
+    .onConflictDoNothing();
+
+  revalidatePath(`/servers/${serverId}/members`);
+  return { success: `Compte « ${input.username} » créé et ajouté au serveur.` };
+}
 
 /** Invite un membre par nom d'utilisateur (permissions par défaut). */
 export async function addMember(

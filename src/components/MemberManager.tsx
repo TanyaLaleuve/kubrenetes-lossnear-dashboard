@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useTransition } from "react";
-import { Trash2, UserPlus } from "lucide-react";
+import { useActionState, useEffect, useRef, useTransition } from "react";
+import { UserCog, Trash2, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import {
   addMember,
+  createSubUser,
   removeMember,
   updateMemberPermissions,
   type ServerFormState,
@@ -52,6 +53,84 @@ function InviteForm({ serverId }: { serverId: string }) {
         </p>
       )}
     </form>
+  );
+}
+
+function CreateSubUserForm({ serverId }: { serverId: string }) {
+  const [state, action, pending] = useActionState(createSubUser, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (state.success) formRef.current?.reset();
+  }, [state.success]);
+
+  return (
+    <details className="rounded-lg border border-border">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground transition-colors duration-150 hover:text-foreground">
+        <UserCog className="size-3.5" aria-hidden />
+        La personne n&apos;a pas encore de compte ? Créer un sous-compte
+      </summary>
+      <form
+        ref={formRef}
+        action={action}
+        data-keep-empty
+        className="space-y-2 border-t border-border p-3"
+      >
+        <input type="hidden" name="serverId" value={serverId} />
+        <p className="text-xs text-muted-foreground">
+          Crée un compte dédié à ce serveur (pas de droit de créer ses propres
+          serveurs). Communique-lui l&apos;identifiant et le mot de passe
+          toi-même.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <label htmlFor="subuser-username" className="text-xs text-muted-foreground">
+              Nom d&apos;utilisateur
+            </label>
+            <input
+              id="subuser-username"
+              name="username"
+              required
+              minLength={3}
+              maxLength={32}
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-accent"
+            />
+          </div>
+          <div>
+            <label htmlFor="subuser-password" className="text-xs text-muted-foreground">
+              Mot de passe (12+)
+            </label>
+            <input
+              id="subuser-password"
+              name="password"
+              type="password"
+              required
+              minLength={12}
+              autoComplete="new-password"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-accent"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={pending}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+          >
+            <UserCog className="size-3.5" aria-hidden />
+            {pending ? "…" : "Créer et ajouter"}
+          </button>
+          {state.error && (
+            <span role="alert" className="text-xs text-destructive">
+              {state.error}
+            </span>
+          )}
+          {state.success && (
+            <span className="text-xs text-accent">{state.success}</span>
+          )}
+        </div>
+      </form>
+    </details>
   );
 }
 
@@ -151,7 +230,12 @@ export function MemberManager({
 }) {
   return (
     <div className="space-y-4">
-      {canManage && <InviteForm serverId={serverId} />}
+      {canManage && (
+        <div className="space-y-2">
+          <InviteForm serverId={serverId} />
+          <CreateSubUserForm serverId={serverId} />
+        </div>
+      )}
 
       {members.length === 0 ? (
         <p className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">

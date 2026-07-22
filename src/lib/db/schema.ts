@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   customType,
   integer,
@@ -41,6 +42,15 @@ export const users = pgTable(
     avatar: bytea("avatar"),
     /** Compte Discord lié (OAuth à venir). */
     discordId: varchar("discord_id", { length: 32 }).unique(),
+    /**
+     * Sous-compte créé par un autre utilisateur (via l'invitation sur un
+     * serveur) plutôt que par un admin. Conservé pour traçabilité et pour
+     * une future conversion en compte indépendant d'un sous-dashboard
+     * (Minecraft, bot) une fois ceux-ci construits.
+     */
+    parentUserId: uuid("parent_user_id").references((): AnyPgColumn => users.id, {
+      onDelete: "set null",
+    }),
     /** Super-admin du panel : gère les droits et quotas des autres comptes. */
     isAdmin: boolean("is_admin").notNull().default(false),
     /** Droit de créer des serveurs custom (accordé par un admin). */
@@ -205,3 +215,22 @@ export const serverMembers = pgTable(
 );
 
 export type ServerMember = typeof serverMembers.$inferSelect;
+
+export const priceInterval = pgEnum("price_interval", ["hour", "month", "year"]);
+
+/**
+ * Métadonnées d'un nœud Kubernetes, purement informatives (K8s ne les stocke
+ * pas) : lien vers l'hébergeur, prix. Clé = nom du nœud (identifiant K8s).
+ */
+export const nodeMeta = pgTable("node_meta", {
+  nodeName: varchar("node_name", { length: 255 }).primaryKey(),
+  hostingUrl: text("hosting_url"),
+  hostingLabel: varchar("hosting_label", { length: 128 }),
+  /** Prix en centimes pour éviter les soucis d'arrondi flottant. */
+  priceCents: integer("price_cents"),
+  priceCurrency: varchar("price_currency", { length: 8 }).notNull().default("EUR"),
+  priceInterval: priceInterval("price_interval"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type NodeMeta = typeof nodeMeta.$inferSelect;

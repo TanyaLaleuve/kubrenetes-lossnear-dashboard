@@ -2,7 +2,7 @@ import Link from "next/link";
 import { eq, inArray, or } from "drizzle-orm";
 import { Plus } from "lucide-react";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { StatusBadge } from "@/components/StatusBadge";
+import { ServerGrid } from "@/components/ServerGrid";
 import { requireView } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 import { serverRuntimeStatus } from "@/lib/servers/k8s";
@@ -121,31 +121,22 @@ export default async function ServersPage({
         </p>
       )}
 
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {withStatus.map(({ server, status }) => (
-          <li key={server.id}>
-            <Link
-              href={`/servers/${server.id}`}
-              className="block rounded-xl border border-border bg-card p-4 transition-colors duration-150 hover:bg-card-hover"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <p className="truncate font-mono text-sm font-semibold">
-                  {server.name}
-                </p>
-                <StatusBadge label={status.label} tone={status.tone} />
-              </div>
-              <p className="mt-2 truncate text-xs text-muted-foreground">
-                {server.image}
-              </p>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
-                port {server.hostPort} · {server.memoryMi} Mio ·{" "}
-                {server.cpuMilli}m CPU · {server.diskGi} Gio ·{" "}
-                {formatAge(server.createdAt)}
-              </p>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {withStatus.length > 0 && (
+        <ServerGrid
+          userId={user.id}
+          items={withStatus.map(({ server, status }) => ({
+            id: server.id,
+            name: server.name,
+            image: server.image,
+            hostPort: server.hostPort,
+            memoryMi: server.memoryMi,
+            cpuMilli: server.cpuMilli,
+            diskGi: server.diskGi,
+            ageLabel: formatAge(server.createdAt),
+            status,
+          }))}
+        />
+      )}
     </div>
   );
 }

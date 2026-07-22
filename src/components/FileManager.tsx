@@ -22,7 +22,46 @@ function formatSize(bytes: number): string {
   return `${bytes} o`;
 }
 
-export function FileManager({ serverId }: { serverId: string }) {
+/**
+ * Extrait les fichiers d'un DataTransfer en rejetant les dossiers (un dossier
+ * glissé doit être compressé et envoyé via le bouton — pas de parcours
+ * récursif ici, trop lent/fragile pour un simple gestionnaire web).
+ */
+function filesFromDrop(dataTransfer: DataTransfer): {
+  files: File[];
+  rejectedDirs: number;
+} {
+  const files: File[] = [];
+  let rejectedDirs = 0;
+
+  if (dataTransfer.items) {
+    for (const item of Array.from(dataTransfer.items)) {
+      if (item.kind !== "file") continue;
+      // webkitGetAsEntry permet de distinguer fichier vs dossier avant lecture.
+      const entry = item.webkitGetAsEntry?.();
+      if (entry?.isDirectory) {
+        rejectedDirs++;
+        continue;
+      }
+      const file = item.getAsFile();
+      if (file) files.push(file);
+    }
+  } else {
+    files.push(...Array.from(dataTransfer.files));
+  }
+
+  return { files, rejectedDirs };
+}
+
+export function FileManager({
+  serverId,
+  canWrite,
+  canDelete,
+}: {
+  serverId: string;
+  canWrite: boolean;
+  canDelete: boolean;
+}) {
   const [path, setPath] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +70,8 @@ export function FileManager({ serverId }: { serverId: string }) {
     null,
   );
   const [saving, setSaving] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragCounter = useRef(0);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const base = `/api/servers/${serverId}/files`;
@@ -119,7 +160,7 @@ export function FileManager({ serverId }: { serverId: string }) {
     }
   }
 
-  async function upload(files: FileList) {
+  async function upload(files: File[] | FileList) {
     setError(null);
     for (const file of Array.from(files)) {
       const dest = join(path, file.name);
@@ -134,6 +175,42 @@ export function FileManager({ serverId }: { serverId: string }) {
     }
     if (uploadRef.current) uploadRef.current.value = "";
     load();
+  }
+
+  function onDragEnter(e: React.DragEvent) {
+    if (!canWrite) return;
+    e.preventDefault();
+    dragCounter.current++;
+    if (e.dataTransfer.types.includes("Files")) setDragging(true);
+  }
+
+  function onDragOver(e: React.DragEvent) {
+    if (!canWrite) return;
+    e.preventDefault();
+  }
+
+  function onDragLeave(e: React.DragEvent) {
+    if (!canWrite) return;
+    e.preventDefault();
+    dragCounter.current = Math.max(0, dragCounter.current - 1);
+    if (dragCounter.current === 0) setDragging(false);
+  }
+
+  function onDrop(e: React.DragEvent) {
+    if (!canWrite) return;
+    e.preventDefault();
+    dragCounter.current = 0;
+    setDragging(false);
+
+    const { files, rejectedDirs } = filesFromDrop(e.dataTransfer);
+    if (rejectedDirs > 0) {
+      setError(
+        rejectedDirs === 1
+          ? "Un dossier a été ignoré : compresse-le (zip) puis envoie-le via le bouton « Envoyer »."
+          : `${rejectedDirs} dossiers ont été ignorés : compresse-les (zip) puis envoie-les via le bouton « Envoyer ».`,
+      );
+    }
+    if (files.length > 0) upload(files);
   }
 
   const crumbs = path ? path.split("/") : [];
@@ -151,28 +228,46 @@ export function FileManager({ serverId }: { serverId: string }) {
             <X className="size-4" aria-hidden />
           </button>
           <p className="min-w-0 flex-1 truncate font-mono text-sm">{editing.name}</p>
-          <button
-            type="button"
-            onClick={saveFile}
-            disabled={saving}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            <Save className="size-4" aria-hidden />
-            {saving ? "…" : "Enregistrer"}
-          </button>
+          {canWrite && (
+            <button
+              type="button"
+              onClick={saveFile}
+              disabled={saving}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              <Save className="size-4" aria-hidden />
+              {saving ? "…" : "Enregistrer"}
+            </button>
+          )}
         </div>
         <textarea
           value={editing.content}
           onChange={(e) => setEditing({ ...editing, content: e.target.value })}
+          readOnly={!canWrite}
           spellCheck={false}
-          className="h-[60vh] w-full resize-none rounded-xl border border-border bg-[#04070f] p-3 font-mono text-xs outline-none focus:border-accent"
+          className="h-[60vh] w-full resize-none rounded-xl border border-border bg-[#04070f] p-3 font-mono text-xs outline-none focus:border-accent read-only:opacity-70"
         />
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div
+      className="relative space-y-3"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {dragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center rounded-xl border-2 border-dashed border-accent bg-accent/10 backdrop-blur-sm">
+          <p className="flex items-center gap-2 rounded-lg bg-background px-4 py-2 text-sm font-medium text-accent shadow">
+            <Upload className="size-4" aria-hidden />
+            Dépose tes fichiers ici
+          </p>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -204,29 +299,40 @@ export function FileManager({ serverId }: { serverId: string }) {
             </span>
           ))}
         </nav>
-        <button
-          type="button"
-          onClick={() => {
-            const name = prompt("Nom du dossier :");
-            if (name) op("mkdir", join(path, name));
-          }}
-          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
-        >
-          <FolderPlus className="size-3.5" aria-hidden />
-          Dossier
-        </button>
-        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground">
-          <Upload className="size-3.5" aria-hidden />
-          Envoyer
-          <input
-            ref={uploadRef}
-            type="file"
-            multiple
-            className="sr-only"
-            onChange={(e) => e.target.files && upload(e.target.files)}
-          />
-        </label>
+        {canWrite && (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                const name = prompt("Nom du dossier :");
+                if (name) op("mkdir", join(path, name));
+              }}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground"
+            >
+              <FolderPlus className="size-3.5" aria-hidden />
+              Dossier
+            </button>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground">
+              <Upload className="size-3.5" aria-hidden />
+              Envoyer
+              <input
+                ref={uploadRef}
+                type="file"
+                multiple
+                className="sr-only"
+                onChange={(e) => e.target.files && upload(e.target.files)}
+              />
+            </label>
+          </>
+        )}
       </div>
+
+      {canWrite && (
+        <p className="text-xs text-muted-foreground">
+          Glisse-dépose des fichiers directement dans la liste. Les dossiers
+          doivent être compressés (zip) puis envoyés via le bouton « Envoyer ».
+        </p>
+      )}
 
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -278,27 +384,31 @@ export function FileManager({ serverId }: { serverId: string }) {
                         <Download className="size-3.5" aria-hidden />
                       </a>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const to = prompt("Renommer en :", entry.name);
-                        if (to && to !== entry.name) op("rename", full, join(path, to));
-                      }}
-                      className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-foreground"
-                      aria-label={`Renommer ${entry.name}`}
-                    >
-                      <Pencil className="size-3.5" aria-hidden />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Supprimer ${entry.name} ?`)) op("delete", full);
-                      }}
-                      className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-destructive"
-                      aria-label={`Supprimer ${entry.name}`}
-                    >
-                      <Trash2 className="size-3.5" aria-hidden />
-                    </button>
+                    {canWrite && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const to = prompt("Renommer en :", entry.name);
+                          if (to && to !== entry.name) op("rename", full, join(path, to));
+                        }}
+                        className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                        aria-label={`Renommer ${entry.name}`}
+                      >
+                        <Pencil className="size-3.5" aria-hidden />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Supprimer ${entry.name} ?`)) op("delete", full);
+                        }}
+                        className="grid size-8 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-destructive"
+                        aria-label={`Supprimer ${entry.name}`}
+                      >
+                        <Trash2 className="size-3.5" aria-hidden />
+                      </button>
+                    )}
                   </div>
                 </li>
               );

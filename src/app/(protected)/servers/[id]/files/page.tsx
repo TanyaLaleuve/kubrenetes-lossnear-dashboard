@@ -1,11 +1,10 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { FileManager } from "@/components/FileManager";
 import { SftpInfo } from "@/components/SftpInfo";
 import { currentUser } from "@/lib/auth/user";
-import { db, schema } from "@/lib/db";
+import { serverAccess } from "@/lib/servers/authz";
 import { PUBLIC_IP } from "@/lib/servers/constants";
 
 export const dynamic = "force-dynamic";
@@ -20,14 +19,13 @@ export default async function ServerFilesPage({
   const { id } = await params;
   const user = await currentUser();
 
-  const rows = await db()
-    .select({ id: schema.servers.id, name: schema.servers.name, ownerId: schema.servers.ownerId })
-    .from(schema.servers)
-    .where(eq(schema.servers.id, id))
-    .limit(1);
-  const server = rows[0];
-  if (!server) notFound();
-  if (server.ownerId !== user.id && !user.isAdmin) redirect("/servers");
+  const access = await serverAccess(user, id);
+  if (!access || !access.permissions.has("files.read")) {
+    redirect(`/servers/${id}`);
+  }
+  const { server, permissions } = access;
+  const canWrite = permissions.has("files.write");
+  const canDelete = permissions.has("files.delete");
 
   return (
     <div className="space-y-6">
@@ -47,13 +45,15 @@ export default async function ServerFilesPage({
         </div>
       </header>
 
-      <SftpInfo
-        host={PUBLIC_IP}
-        port={2222}
-        username={`${user.username}.${server.id}`}
-      />
+      {permissions.has("files.sftp") && (
+        <SftpInfo
+          host={PUBLIC_IP}
+          port={2222}
+          username={`${user.username}.${server.id}`}
+        />
+      )}
 
-      <FileManager serverId={server.id} />
+      <FileManager serverId={server.id} canWrite={canWrite} canDelete={canDelete} />
     </div>
   );
 }

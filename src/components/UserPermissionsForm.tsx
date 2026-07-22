@@ -32,9 +32,6 @@ export function UserPermissionsForm({
   return (
     <form action={action} className="space-y-3">
       <input type="hidden" name="userId" value={userId} />
-      <p className="text-xs font-medium text-muted-foreground">
-        Sections visibles dans le dashboard
-      </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {DASHBOARD_PERMISSION_GROUPS.map((group) => (
           <fieldset key={group.key} className="space-y-1.5">

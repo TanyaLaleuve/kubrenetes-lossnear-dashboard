@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { asc, eq } from "drizzle-orm";
 import {
   ArrowLeft,
   FolderOpen,
@@ -12,16 +11,12 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
-import { ConfirmButton } from "@/components/ConfirmButton";
 import { ServerActionButton } from "@/components/ServerActionButton";
 import { ServerAddress } from "@/components/ServerAddress";
 import { ServerConsole } from "@/components/ServerConsole";
-import { ServerOwner } from "@/components/ServerOwner";
 import { StatusBadge } from "@/components/StatusBadge";
 import { currentUser } from "@/lib/auth/user";
-import { db, schema } from "@/lib/db";
 import {
-  deleteServer,
   killServer,
   restartServer,
   startServer,
@@ -60,23 +55,13 @@ export default async function ServerDetailPage({
     can("control.stop") ||
     can("control.restart") ||
     can("control.kill");
+  const canAnyManage = can("files.read") || can("members.read") || privileged;
 
-  const [status, users, ownerRow] = await Promise.all([
-    serverRuntimeStatus(server).catch(() => ({
-      label: "Error" as const,
-      tone: "error" as const,
-      pod: undefined,
-    })),
-    db()
-      .select({ id: schema.users.id, username: schema.users.username })
-      .from(schema.users)
-      .orderBy(asc(schema.users.username)),
-    db()
-      .select({ username: schema.users.username })
-      .from(schema.users)
-      .where(eq(schema.users.id, server.ownerId))
-      .limit(1),
-  ]);
+  const status = await serverRuntimeStatus(server).catch(() => ({
+    label: "Error" as const,
+    tone: "error" as const,
+    pod: undefined,
+  }));
 
   const metrics =
     status.label === "Running"
@@ -158,49 +143,42 @@ export default async function ServerDetailPage({
         </section>
       )}
 
-      {/* Gestion : fichiers, permissions, paramètres (à venir), suppression. */}
-      <section
-        aria-label="Gestion"
-        className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
-      >
-        {can("files.read") && (
-          <Link
-            href={`/servers/${server.id}/files`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-          >
-            <FolderOpen className="size-4" aria-hidden />
-            Fichiers
-          </Link>
-        )}
-        {can("members.read") && (
-          <Link
-            href={`/servers/${server.id}/members`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-          >
-            <Users className="size-4" aria-hidden />
-            Permissions
-          </Link>
-        )}
-        {privileged && (
-          <Link
-            href={`/servers/${server.id}/settings`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-          >
-            <Settings className="size-4" aria-hidden />
-            Paramètres
-          </Link>
-        )}
-        {privileged && (
-          <div className="ml-auto">
-            <ConfirmButton
-              action={deleteServer.bind(null, server.id)}
-              confirmLabel="Supprimer définitivement ?"
+      {/* Gestion : fichiers, permissions, paramètres. Suppression et
+          changement de propriétaire déplacés dans Gestion & Migration. */}
+      {canAnyManage && (
+        <section
+          aria-label="Gestion"
+          className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
+        >
+          {can("files.read") && (
+            <Link
+              href={`/servers/${server.id}/files`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
             >
-              Supprimer
-            </ConfirmButton>
-          </div>
-        )}
-      </section>
+              <FolderOpen className="size-4" aria-hidden />
+              Fichiers
+            </Link>
+          )}
+          {can("members.read") && (
+            <Link
+              href={`/servers/${server.id}/members`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <Users className="size-4" aria-hidden />
+              Permissions
+            </Link>
+          )}
+          {privileged && (
+            <Link
+              href={`/servers/${server.id}/settings`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <Settings className="size-4" aria-hidden />
+              Paramètres
+            </Link>
+          )}
+        </section>
+      )}
 
       {can("console.read") && (
         <ServerConsole
@@ -240,31 +218,21 @@ export default async function ServerDetailPage({
         <Info label="Disque">{server.diskGi} Gio (persistant)</Info>
       </section>
 
-      <section aria-label="Propriété" className="grid gap-3 sm:grid-cols-2">
-        {privileged && (
-          <ServerOwner
-            serverId={server.id}
-            ownerId={server.ownerId}
-            ownerName={ownerRow[0]?.username ?? "?"}
-            users={users}
-          />
-        )}
-        {Object.keys(server.env).length > 0 && (
-          <div className="rounded-xl border border-border bg-card p-4">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Variables d&apos;environnement
-            </p>
-            <dl className="mt-1.5 space-y-1 overflow-x-auto font-mono text-xs">
-              {Object.entries(server.env).map(([key, value]) => (
-                <div key={key} className="flex gap-2">
-                  <dt className="text-accent">{key}=</dt>
-                  <dd className="break-all text-muted-foreground">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-        )}
-      </section>
+      {Object.keys(server.env).length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Variables d&apos;environnement
+          </p>
+          <dl className="mt-1.5 space-y-1 overflow-x-auto font-mono text-xs">
+            {Object.entries(server.env).map(([key, value]) => (
+              <div key={key} className="flex gap-2">
+                <dt className="text-accent">{key}=</dt>
+                <dd className="break-all text-muted-foreground">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
     </div>
   );
 }

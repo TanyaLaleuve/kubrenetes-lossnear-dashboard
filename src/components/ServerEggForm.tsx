@@ -40,7 +40,7 @@ export function ServerEggForm({
     <form action={formAction} className="space-y-6 rounded-xl border border-border bg-card p-6">
       <div>
         <h2 className="text-base font-semibold flex items-center gap-2">
-          <EggIcon className="size-5 text-accent" /> Configuration de l'Egg & Conteneur
+          <EggIcon className="size-5 text-accent" /> Configuration de l&apos;Egg & Conteneur
         </h2>
         <p className="text-xs text-muted-foreground">
           {egg
@@ -118,7 +118,7 @@ export function ServerEggForm({
       {egg && egg.variables.length > 0 && (
         <div className="space-y-4 pt-4 border-t border-border">
           <h3 className="text-sm font-semibold flex items-center gap-1.5">
-            <Code className="size-4 text-muted-foreground" /> Variables d'environnement de l'Egg
+            <Code className="size-4 text-muted-foreground" /> Variables d&apos;environnement de l&apos;Egg
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
             {egg.variables

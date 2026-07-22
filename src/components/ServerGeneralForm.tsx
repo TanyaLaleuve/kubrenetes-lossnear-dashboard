@@ -37,7 +37,7 @@ export function ServerGeneralForm({
       <div>
         <h2 className="text-base font-semibold">Paramètres Généraux</h2>
         <p className="text-xs text-muted-foreground">
-          Modifiez l'identité, le propriétaire et les ressources allouées à ce serveur.
+          Modifiez l&apos;identité, le propriétaire et les ressources allouées à ce serveur.
         </p>
       </div>
 
@@ -194,7 +194,7 @@ export function ServerGeneralForm({
         {/* Adresse d'affichage */}
         <div className="space-y-2 sm:col-span-2">
           <label htmlFor="displayAddress" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Globe className="size-3.5" /> Adresse personnalisée d'affichage (optionnel)
+            <Globe className="size-3.5" /> Adresse personnalisée d&apos;affichage (optionnel)
           </label>
           <input
             id="displayAddress"

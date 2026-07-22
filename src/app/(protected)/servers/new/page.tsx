@@ -13,6 +13,24 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Nouveau serveur" };
 
+function Header({ subtitle, back }: { subtitle: string; back: string }) {
+  return (
+    <header className="flex items-center gap-3">
+      <Link
+        href={back}
+        aria-label="Retour"
+        className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" aria-hidden />
+      </Link>
+      <div>
+        <h1 className="text-xl font-semibold">Nouveau serveur</h1>
+        <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
+      </div>
+    </header>
+  );
+}
+
 export default async function NewServerPage({
   searchParams,
 }: {
@@ -41,24 +59,6 @@ export default async function NewServerPage({
     portMax: bounds.max,
     portsLabel: portsLabel(user),
   };
-
-  function Header({ subtitle, back }: { subtitle: string; back: string }) {
-    return (
-      <header className="flex items-center gap-3">
-        <Link
-          href={back}
-          aria-label="Retour"
-          className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-        </Link>
-        <div>
-          <h1 className="text-xl font-semibold">Nouveau serveur</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>
-        </div>
-      </header>
-    );
-  }
 
   // --- Création depuis un egg ---
   if (eggId) {

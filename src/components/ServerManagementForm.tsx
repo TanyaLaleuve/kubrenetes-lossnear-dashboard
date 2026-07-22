@@ -44,7 +44,7 @@ export function ServerManagementForm({
             <RefreshCw className="size-5 text-amber-500" /> Réinstallation du serveur
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Rejoue le script d'installation de l'Egg et réinitialise les fichiers système tout en conservant le disque de stockage.
+            Rejoue le script d&apos;installation de l&apos;Egg et réinitialise les fichiers système tout en conservant le disque de stockage.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export function ServerManagementForm({
             <ArrowRightLeft className="size-5 text-accent" /> Migration de serveur (Nœud K8s)
           </h2>
           <p className="text-xs text-muted-foreground mt-1">
-            Déplacez l'exécution du pod de ce serveur sur un autre nœud physique de votre cluster Kubernetes.
+            Déplacez l&apos;exécution du pod de ce serveur sur un autre nœud physique de votre cluster Kubernetes.
           </p>
         </div>
 

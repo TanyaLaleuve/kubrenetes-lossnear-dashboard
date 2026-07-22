@@ -41,7 +41,7 @@ export default async function ServerSettingsPermissionsPage({
         <div>
           <h2 className="text-base font-semibold">Membres et Permissions</h2>
           <p className="text-xs text-muted-foreground">
-            Accordez l'accès à ce serveur à d'autres utilisateurs et attribuez-leur des permissions spécifiques.
+            Accordez l&apos;accès à ce serveur à d&apos;autres utilisateurs et attribuez-leur des permissions spécifiques.
           </p>
         </div>
         <MemberManager serverId={id} members={members} canManage={canManage} />
