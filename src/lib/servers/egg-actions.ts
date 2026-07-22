@@ -12,6 +12,7 @@ import {
   parsePterodactylEgg,
   type EggVariable,
 } from "./eggs";
+import { upsertEggImages } from "@/lib/images/actions";
 
 export type EggFormState = { error?: string };
 
@@ -91,6 +92,7 @@ export async function importEgg(
     })
     .returning({ id: schema.eggs.id });
 
+  await upsertEggImages(egg.dockerImages);
   revalidatePath("/eggs");
   redirect(`/eggs/${row.id}`);
 }
@@ -146,6 +148,8 @@ export async function saveEgg(
     variables,
     updatedAt: new Date(),
   };
+
+  await upsertEggImages(dockerImages);
 
   if (eggId) {
     if (!z.string().uuid().safeParse(eggId).success) {

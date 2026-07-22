@@ -193,6 +193,29 @@ export const eggs = pgTable("eggs", {
 
 export type Egg = typeof eggs.$inferSelect;
 
+/** Origine d'une image du catalogue : ajoutée à la main ou issue d'un egg. */
+export const imageSource = pgEnum("image_source", ["manual", "egg"]);
+
+/**
+ * Catalogue d'images Docker : bibliothèque persistante et indépendante des
+ * eggs. Alimentée automatiquement à l'import/sauvegarde d'un egg (upsert) et
+ * enrichissable à la main. Supprimer un egg ne retire pas ses images d'ici.
+ */
+export const dockerImages = pgTable("docker_images", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** Référence complète de l'image (ex. ghcr.io/pterodactyl/yolks:java_17). */
+  reference: text("reference").notNull().unique(),
+  /** Libellé lisible (ex. "Java 17"). */
+  label: varchar("label", { length: 128 }),
+  /** Catégorie libre pour le regroupement (ex. "Minecraft", "Bots"). */
+  category: varchar("category", { length: 64 }),
+  source: imageSource("source").notNull().default("manual"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type DockerImage = typeof dockerImages.$inferSelect;
+
 /**
  * Membres invités sur un serveur (sous-utilisateurs, modèle Pterodactyl).
  * `permissions` = liste de clés (voir lib/servers/permissions.ts).

@@ -10,6 +10,7 @@ import {
   Layers,
   LayoutDashboard,
   LogOut,
+  Package,
   Server,
   SquareStack,
   Users,
@@ -126,6 +127,12 @@ export function Nav({ user }: { user: NavUser }) {
                 label="Templates (eggs)"
                 icon={Egg}
                 active={isActive(pathname, "/eggs")}
+              />
+              <SidebarLink
+                href="/images"
+                label="Images Docker"
+                icon={Package}
+                active={isActive(pathname, "/images")}
               />
             </>
           )}
