@@ -1,8 +1,9 @@
 "use server";
 
 import { hash } from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
@@ -126,4 +127,62 @@ export async function updateUserPermissions(
 
   revalidatePath("/admin/users");
   return { success: "Permissions mises à jour." };
+}
+
+/**
+ * Réinitialise le mot de passe d'un utilisateur (admin). L'admin définit un
+ * nouveau mot de passe — il ne voit jamais l'ancien (stocké haché bcrypt, à
+ * sens unique). Communique le nouveau mot de passe à la personne.
+ */
+export async function adminSetPassword(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const admin = await currentUser();
+  if (!admin.isAdmin) return { error: "Réservé aux admins." };
+
+  const userId = String(formData.get("userId") ?? "");
+  if (!z.string().uuid().safeParse(userId).success) {
+    return { error: "Utilisateur invalide." };
+  }
+  const next = String(formData.get("newPassword") ?? "");
+  const confirm = String(formData.get("confirmPassword") ?? "");
+  if (next.length < 12) {
+    return { error: "Mot de passe : 12 caractères minimum." };
+  }
+  if (next !== confirm) {
+    return { error: "La confirmation ne correspond pas." };
+  }
+
+  await db()
+    .update(schema.users)
+    .set({ passwordHash: await hash(next, 12), updatedAt: new Date() })
+    .where(eq(schema.users.id, userId));
+
+  return { success: "Mot de passe réinitialisé. Communique-le à la personne." };
+}
+
+/**
+ * Supprime un compte (admin). Refuse si le compte possède des serveurs
+ * (leurs objets Kubernetes seraient orphelins) : il faut d'abord les
+ * supprimer ou les transférer. Impossible sur son propre compte.
+ */
+export async function deleteUser(userId: string) {
+  const admin = await currentUser();
+  if (!admin.isAdmin) throw new Error("Réservé aux admins.");
+  if (userId === admin.id) throw new Error("Impossible de supprimer son propre compte.");
+
+  const [owned] = await db()
+    .select({ count: sql<number>`count(*)::int` })
+    .from(schema.servers)
+    .where(eq(schema.servers.ownerId, userId));
+  if (owned.count > 0) {
+    throw new Error(
+      "Ce compte possède des serveurs. Supprime-les ou transfère-les d'abord.",
+    );
+  }
+
+  await db().delete(schema.users).where(eq(schema.users.id, userId));
+  revalidatePath("/admin/users");
+  redirect("/admin/users");
 }

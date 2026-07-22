@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { eq, sql } from "drizzle-orm";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
+import { AdminPasswordForm } from "@/components/AdminPasswordForm";
 import { Avatar } from "@/components/Avatar";
+import { ConfirmButton } from "@/components/ConfirmButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { UserGrantsForm } from "@/components/UserGrantsForm";
 import { UserPermissionsForm } from "@/components/UserPermissionsForm";
+import { deleteUser } from "@/lib/admin/actions";
 import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 
@@ -96,6 +99,37 @@ export default async function AdminUserDetailPage({
               permissions={user.permissions}
               isAdmin={user.isAdmin}
             />
+          </div>
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h2 className="mb-3 text-sm font-semibold">Mot de passe</h2>
+            <AdminPasswordForm userId={user.id} />
+          </div>
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+            <h2 className="text-sm font-semibold text-destructive">
+              Supprimer le compte
+            </h2>
+            {user.serverCount > 0 ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ce compte possède {user.serverCount} serveur
+                {user.serverCount > 1 ? "s" : ""}. Supprime-les ou transfère-les
+                d&apos;abord (leur propriétaire ne peut pas être supprimé tant
+                qu&apos;il possède des serveurs).
+              </p>
+            ) : (
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Action irréversible. Les invitations de ce compte sur
+                  d&apos;autres serveurs sont retirées.
+                </p>
+                <ConfirmButton
+                  action={deleteUser.bind(null, user.id)}
+                  confirmLabel="Oui, supprimer le compte"
+                >
+                  <Trash2 className="size-4 mr-1.5" />
+                  Supprimer le compte
+                </ConfirmButton>
+              </div>
+            )}
           </div>
         </div>
       )}
