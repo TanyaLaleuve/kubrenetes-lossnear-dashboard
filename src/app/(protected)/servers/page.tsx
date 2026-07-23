@@ -143,7 +143,10 @@ export default async function ServersPage({
             cpuMilli: server.cpuMilli,
             diskGi: server.diskGi,
             ageLabel: formatAge(server.createdAt),
-            status,
+            // Uniquement les champs sérialisables : `status.pod` est une
+            // instance de classe du client K8s, non transmissible à un
+            // composant client (erreur de sérialisation React).
+            status: { label: status.label, tone: status.tone },
           }))}
         />
       )}
