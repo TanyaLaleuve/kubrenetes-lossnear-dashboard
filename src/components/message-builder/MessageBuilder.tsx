@@ -27,7 +27,7 @@ import {
 const input =
   "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none transition-colors duration-150 focus:border-accent disabled:cursor-not-allowed disabled:opacity-50";
 
-type Tab = "editor" | "variables" | "preview";
+type Tab = "editor" | "variables";
 
 type SetValue = (v: string) => void;
 
@@ -130,7 +130,6 @@ export function MessageBuilder({
           [
             ["editor", "Éditeur", Pencil],
             ["variables", "Variables", Variable],
-            ["preview", "Aperçu", Eye],
           ] as const
         ).map(([key, label, Icon]) => (
           <button
@@ -234,8 +233,9 @@ export function MessageBuilder({
             )}
           </div>
 
-          {/* Aperçu attaché (desktop) — séparé par un trait. */}
-          <div className="hidden border-l border-border bg-background/40 lg:block">
+          {/* Aperçu attaché en direct : sous l'éditeur sur mobile, à côté sur
+              grand écran. Remplace l'ancien onglet Aperçu. */}
+          <div className="border-t border-border bg-background/40 lg:border-l lg:border-t-0">
             <div className="sticky top-0 space-y-1.5 p-3">
               <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Eye className="size-3.5" aria-hidden />
@@ -281,31 +281,6 @@ export function MessageBuilder({
         </div>
       )}
 
-      {tab === "preview" && (
-        <div className="space-y-2 p-3">
-          {view === "default" && (
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">
-                Aperçu du message par défaut.
-              </p>
-              <button
-                type="button"
-                onClick={restoreDefault}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-              >
-                <RotateCcw className="size-3.5" aria-hidden />
-                Restaurer ce défaut
-              </button>
-            </div>
-          )}
-          <DiscordMessagePreview
-            payload={view === "default" ? defaultPayload : value}
-            variables={variables}
-            botName={botName}
-            botAvatar={botAvatar}
-          />
-        </div>
-      )}
     </div>
   );
 }
