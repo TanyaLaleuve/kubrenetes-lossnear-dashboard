@@ -106,6 +106,9 @@ export function UserGrantsForm({
           {state.error}
         </p>
       )}
+      {state.success && (
+        <p className="text-sm text-accent">{state.success}</p>
+      )}
       <button
         type="submit"
         disabled={pending}

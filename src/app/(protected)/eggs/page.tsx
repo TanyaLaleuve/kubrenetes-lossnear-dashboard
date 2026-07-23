@@ -18,6 +18,20 @@ export default async function EggsPage() {
     .from(schema.eggs)
     .orderBy(desc(schema.eggs.createdAt));
 
+  // Regroupement par catégorie, "Sans catégorie" en dernier.
+  const byCategory = new Map<string, typeof eggs>();
+  for (const egg of eggs) {
+    const key = egg.category?.trim() || "Sans catégorie";
+    const list = byCategory.get(key) ?? [];
+    list.push(egg);
+    byCategory.set(key, list);
+  }
+  const groupedEggs = [...byCategory.entries()].sort(([a], [b]) => {
+    if (a === "Sans catégorie") return 1;
+    if (b === "Sans catégorie") return -1;
+    return a.localeCompare(b, "fr");
+  });
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center gap-3">
@@ -57,8 +71,16 @@ export default async function EggsPage() {
           </p>
         </div>
       ) : (
+        groupedEggs.map(([category, list]) => (
+        <section key={category} className="space-y-2">
+          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {category}
+            <span className="rounded-full bg-card px-1.5 py-0.5 text-[10px]">
+              {list.length}
+            </span>
+          </h2>
         <ul className="grid gap-3 sm:grid-cols-2">
-          {eggs.map((egg) => (
+          {list.map((egg) => (
             <li key={egg.id}>
               <Link
                 href={`/eggs/${egg.id}`}
@@ -91,6 +113,8 @@ export default async function EggsPage() {
             </li>
           ))}
         </ul>
+        </section>
+        ))
       )}
     </div>
   );

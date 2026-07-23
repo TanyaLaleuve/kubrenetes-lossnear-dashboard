@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
 
-export type NodeMetaFormState = { error?: string };
+export type NodeMetaFormState = { error?: string; success?: string };
 
 const metaSchema = z.object({
   nodeName: z.string().trim().min(1).max(255),
@@ -65,7 +65,7 @@ export async function updateNodeMeta(
     });
 
   revalidatePath("/nodes");
-  return {};
+  return { success: "Informations du nœud enregistrées." };
 }
 
 export async function deleteNodeMeta(nodeName: string) {

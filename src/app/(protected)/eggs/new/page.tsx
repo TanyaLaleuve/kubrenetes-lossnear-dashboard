@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { EggForm } from "@/components/EggForm";
 import { currentUser } from "@/lib/auth/user";
+import { db, schema } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,13 @@ export const metadata = { title: "Nouveau template" };
 export default async function NewEggPage() {
   const user = await currentUser();
   if (!user.isAdmin) redirect("/servers");
+
+  const rows = await db()
+    .select({ category: schema.eggs.category })
+    .from(schema.eggs);
+  const categories = [
+    ...new Set(rows.map((r) => r.category).filter((c): c is string => !!c)),
+  ].sort((a, b) => a.localeCompare(b, "fr"));
 
   return (
     <div className="space-y-6">
@@ -31,7 +39,7 @@ export default async function NewEggPage() {
       </header>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <EggForm />
+        <EggForm categories={categories} />
       </div>
     </div>
   );

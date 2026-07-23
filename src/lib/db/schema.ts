@@ -156,6 +156,8 @@ export const eggs = pgTable("eggs", {
   name: varchar("name", { length: 96 }).notNull(),
   description: text("description").notNull().default(""),
   author: varchar("author", { length: 128 }),
+  /** Catégorie libre pour regrouper les eggs (ex. "Minecraft", "Bots"). */
+  category: varchar("category", { length: 64 }),
   /** Variantes d'image { libellé: image } — au moins une. */
   dockerImages: jsonb("docker_images")
     .$type<Record<string, string>>()

@@ -58,6 +58,12 @@ export function ServerManagementForm({
           </div>
         )}
 
+        {reinstallState.success && (
+          <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs text-accent">
+            {reinstallState.success}
+          </div>
+        )}
+
         <form action={reinstallAction} className="flex items-center justify-between pt-2 border-t border-border">
           <input type="hidden" name="serverId" value={server.id} />
           <div className="text-xs text-muted-foreground">
@@ -98,6 +104,12 @@ export function ServerManagementForm({
         {migrateState.error && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3 text-xs text-destructive">
             {migrateState.error}
+          </div>
+        )}
+
+        {migrateState.success && (
+          <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs text-accent">
+            {migrateState.success}
           </div>
         )}
 

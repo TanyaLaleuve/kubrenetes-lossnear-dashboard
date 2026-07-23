@@ -1,0 +1,1 @@
+ALTER TABLE "eggs" ADD COLUMN "category" varchar(64);

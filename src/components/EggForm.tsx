@@ -15,7 +15,14 @@ function imagesToText(images: Record<string, string>): string {
     .join("\n");
 }
 
-export function EggForm({ egg }: { egg?: Egg }) {
+export function EggForm({
+  egg,
+  categories = [],
+}: {
+  egg?: Egg;
+  /** Catégories déjà utilisées, proposées en autocomplétion. */
+  categories?: string[];
+}) {
   const [state, action, pending] = useActionState(saveEgg, initialState);
 
   return (
@@ -47,6 +54,27 @@ export function EggForm({ egg }: { egg?: Egg }) {
             placeholder="lossnear"
             className={inputClass}
           />
+        </div>
+        <div className="space-y-1.5 sm:col-span-2">
+          <label htmlFor="category" className="text-sm font-medium">
+            Catégorie (optionnel)
+          </label>
+          <input
+            id="category"
+            name="category"
+            list="egg-categories"
+            defaultValue={egg?.category ?? ""}
+            placeholder="Minecraft, Bots, Bases de données…"
+            className={inputClass}
+          />
+          <datalist id="egg-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+          <p className="text-xs text-muted-foreground">
+            Sert à regrouper les templates dans la liste.
+          </p>
         </div>
       </div>
 

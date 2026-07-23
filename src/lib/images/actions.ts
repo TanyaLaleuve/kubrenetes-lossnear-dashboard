@@ -112,6 +112,12 @@ export async function deleteImage(id: string) {
 export async function upsertEggImages(
   images: Record<string, string>,
 ): Promise<void> {
+  // Exportée depuis un fichier "use server" : c'est donc une action serveur
+  // atteignable depuis le client. On revérifie le rôle même si les appelants
+  // (import/sauvegarde d'egg) sont déjà réservés aux admins.
+  const user = await currentUser();
+  if (!user.isAdmin) return;
+
   const rows = Object.entries(images)
     .filter(([, ref]) => typeof ref === "string" && ref.trim())
     .map(([label, reference]) => ({

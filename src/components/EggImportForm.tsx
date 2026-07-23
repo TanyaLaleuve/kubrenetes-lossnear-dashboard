@@ -34,6 +34,19 @@ export function EggImportForm() {
         </span>
       </div>
 
+      <div className="space-y-1.5">
+        <label htmlFor="import-category" className="text-xs text-muted-foreground">
+          Catégorie (optionnel)
+        </label>
+        <input
+          id="import-category"
+          name="category"
+          data-keep-empty
+          placeholder="Minecraft, Bots, Bases de données…"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-accent"
+        />
+      </div>
+
       <textarea
         ref={textareaRef}
         name="json"

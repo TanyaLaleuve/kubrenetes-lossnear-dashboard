@@ -26,6 +26,13 @@ export default async function EditEggPage({
     .limit(1);
   if (!egg) notFound();
 
+  const rows = await db()
+    .select({ category: schema.eggs.category })
+    .from(schema.eggs);
+  const categories = [
+    ...new Set(rows.map((r) => r.category).filter((c): c is string => !!c)),
+  ].sort((a, b) => a.localeCompare(b, "fr"));
+
   return (
     <div className="space-y-6">
       <header className="flex items-center gap-3">
@@ -45,7 +52,7 @@ export default async function EditEggPage({
       </header>
 
       <div className="rounded-xl border border-border bg-card p-5">
-        <EggForm egg={egg} />
+        <EggForm egg={egg} categories={categories} />
       </div>
     </div>
   );

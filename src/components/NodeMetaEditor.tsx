@@ -109,6 +109,9 @@ export function NodeMetaEditor({
             {state.error}
           </p>
         )}
+        {state.success && (
+          <p className="text-xs text-accent">{state.success}</p>
+        )}
         <button
           type="submit"
           disabled={pending}

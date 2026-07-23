@@ -470,7 +470,7 @@ export async function updateServerAddress(
     .set({ displayAddress: parsed.data || null, updatedAt: new Date() })
     .where(eq(schema.servers.id, server.id));
   revalidatePath(`/servers/${id}`);
-  return {};
+  return { success: "Adresse mise à jour." };
 }
 
 const generalSettingsSchema = z.object({
@@ -579,7 +579,7 @@ export async function updateServerGeneralSettings(
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings`);
   revalidatePath("/servers");
-  return {};
+  return { success: "Paramètres enregistrés." };
 }
 
 /** Mise à jour des paramètres d'Egg (Image Docker, commande startup, variables). */
@@ -634,7 +634,7 @@ export async function updateServerEggSettings(
   await updateServerWorkload(updated);
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings/startup`);
-  return {};
+  return { success: "Configuration enregistrée." };
 }
 
 /** Migration du serveur vers un nœud Kubernetes spécifique. */
@@ -665,7 +665,7 @@ export async function migrateServerAction(
 
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings/management`);
-  return {};
+  return { success: nodeName ? `Serveur épinglé sur ${nodeName}.` : "Placement remis en automatique." };
 }
 
 /** Réinstallation du serveur : suppression du marqueur d'install et relance de l'initContainer. */
@@ -697,7 +697,7 @@ export async function reinstallServerAction(
 
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings/management`);
-  return {};
+  return { success: "Réinstallation lancée : le script rejouera au prochain démarrage." };
 }
 
 // ---- Membres d'un serveur (sous-utilisateurs) ----
@@ -923,5 +923,5 @@ export async function updateUserGrants(
     );
 
   revalidatePath("/admin/users");
-  return {};
+  return { success: "Droits et quotas enregistrés." };
 }

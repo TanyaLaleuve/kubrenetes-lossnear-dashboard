@@ -56,6 +56,12 @@ export function ServerEggForm({
         </div>
       )}
 
+      {state.success && (
+        <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs text-accent">
+          {state.success}
+        </div>
+      )}
+
       <input type="hidden" name="serverId" value={server.id} />
 
       {/* Choix de l'image Docker */}
