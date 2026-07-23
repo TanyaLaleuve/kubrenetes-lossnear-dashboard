@@ -756,8 +756,17 @@ export async function createSubUser(
     throw error;
   }
 
-  revalidatePath(`/servers/${serverId}/members`);
+  revalidateMemberPages(serverId);
   return { success: `Compte « ${input.username} » créé et ajouté au serveur.` };
+}
+
+/**
+ * Rafraîchit les deux pages qui listent les membres : l'onglet Permissions des
+ * paramètres et la page /members historique.
+ */
+function revalidateMemberPages(serverId: string) {
+  revalidatePath(`/servers/${serverId}/settings/permissions`);
+  revalidatePath(`/servers/${serverId}/members`);
 }
 
 /** Invite un membre par nom d'utilisateur (permissions par défaut). */
@@ -793,8 +802,8 @@ export async function addMember(
     })
     .onConflictDoNothing();
 
-  revalidatePath(`/servers/${serverId}/members`);
-  return {};
+  revalidateMemberPages(serverId);
+  return { success: `« ${identifier} » ajouté au serveur.` };
 }
 
 export async function updateMemberPermissions(
@@ -818,8 +827,8 @@ export async function updateMemberPermissions(
         eq(schema.serverMembers.userId, memberId),
       ),
     );
-  revalidatePath(`/servers/${serverId}/members`);
-  return {};
+  revalidateMemberPages(serverId);
+  return { success: "Permissions enregistrées." };
 }
 
 export async function removeMember(serverId: string, memberId: string) {
@@ -833,7 +842,7 @@ export async function removeMember(serverId: string, memberId: string) {
         eq(schema.serverMembers.userId, memberId),
       ),
     );
-  revalidatePath(`/servers/${serverId}/members`);
+  revalidateMemberPages(serverId);
 }
 
 // ---- Administration (droits + quotas) ----

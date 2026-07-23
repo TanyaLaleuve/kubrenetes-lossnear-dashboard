@@ -52,6 +52,9 @@ function InviteForm({ serverId }: { serverId: string }) {
           {state.error}
         </p>
       )}
+      {state.success && (
+        <p className="w-full text-sm text-accent">{state.success}</p>
+      )}
     </form>
   );
 }
@@ -212,6 +215,9 @@ function MemberCard({
             <span role="alert" className="text-xs text-destructive">
               {state.error}
             </span>
+          )}
+          {state.success && (
+            <span className="text-xs text-accent">{state.success}</span>
           )}
         </div>
       </form>
