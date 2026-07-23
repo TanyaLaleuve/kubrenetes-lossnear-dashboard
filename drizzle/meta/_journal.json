@@ -120,6 +120,13 @@
       "when": 1784826576822,
       "tag": "0016_server_show_port",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784831686704,
+      "tag": "0017_app_settings",
+      "breakpoints": true
     }
   ]
 }

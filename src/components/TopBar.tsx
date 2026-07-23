@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, LogOut, Palette, Server } from "lucide-react";
+import { Bot, LogOut, Server } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import { logout } from "@/lib/auth/actions";
 
@@ -58,17 +58,6 @@ export function TopBar({ user }: { user: TopBarUser }) {
       </nav>
 
       <div className="flex shrink-0 items-center gap-1">
-        <Link
-          href="/apparence"
-          aria-label="Apparence"
-          className={`grid size-9 place-items-center rounded-lg transition-colors duration-150 ${
-            pathname.startsWith("/apparence")
-              ? "bg-accent/10 text-accent"
-              : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
-          }`}
-        >
-          <Palette className="size-4" aria-hidden />
-        </Link>
         <Link
           href="/profile"
           className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors duration-150 ${

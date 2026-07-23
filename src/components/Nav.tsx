@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   MessageSquare,
   Package,
+  Palette,
   Server,
   SquareStack,
   Users,
@@ -134,6 +135,12 @@ export function Nav({ user }: { user: NavUser }) {
                 label="Message builder"
                 icon={MessageSquare}
                 active={isActive(pathname, "/message-builder")}
+              />
+              <SidebarLink
+                href="/admin/apparence"
+                label="Apparence"
+                icon={Palette}
+                active={isActive(pathname, "/admin/apparence")}
               />
             </>
           )}

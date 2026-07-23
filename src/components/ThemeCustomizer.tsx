@@ -1,54 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Check, Paintbrush, RotateCcw } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Check, Globe, Paintbrush, RotateCcw } from "lucide-react";
 import {
   DEFAULT_THEME,
   THEME_PRESETS,
   THEME_TOKENS,
   applyTheme,
-  forgetTheme,
-  readStoredTheme,
-  storeTheme,
+  matchPreset,
   type Theme,
 } from "@/lib/theme";
+import {
+  resetSiteTheme,
+  saveSiteTheme,
+  type ThemeFormState,
+} from "@/lib/theme-actions";
 
 /**
- * Bac à sable de couleurs : palettes prêtes + réglage jeton par jeton, appliqué
- * en direct sur tout le site et mémorisé par navigateur. Aucune permission
- * requise — c'est une préférence locale.
+ * Personnalisateur de palette (administration) : palettes prêtes + réglage
+ * jeton par jeton, aperçu en direct sur tout le site, puis application globale
+ * pour tous les utilisateurs. « Réinitialiser » remet le thème par défaut.
  */
-export function ThemeCustomizer() {
-  // Initialisé sur le défaut pour un rendu serveur stable (localStorage n'existe
-  // pas côté serveur) ; la préférence enregistrée est chargée au montage.
-  const [theme, setTheme] = useState<Theme>(DEFAULT_THEME);
-  // Palette active dérivée du thème : pas d'état à synchroniser.
+export function ThemeCustomizer({ initial }: { initial: Theme }) {
+  const [theme, setTheme] = useState<Theme>(initial);
+  const [feedback, setFeedback] = useState<ThemeFormState>({});
+  const [pending, startTransition] = useTransition();
   const activePreset = matchPreset(theme);
 
-  useEffect(() => {
-    const stored = readStoredTheme();
-    // Chargement unique de la préférence locale : ne peut se faire qu'après
-    // hydratation (localStorage indisponible au rendu serveur).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (stored) setTheme({ ...DEFAULT_THEME, ...stored });
-  }, []);
-
-  function update(next: Theme) {
+  // Aperçu local immédiat : pose les variables sur <html> sans passer par le
+  // serveur. L'enregistrement seul les rend permanentes et globales.
+  function preview(next: Theme) {
     setTheme(next);
+    setFeedback({});
     applyTheme(next);
-    storeTheme(next);
   }
 
   function setToken(key: string, value: string) {
-    update({ ...theme, [key]: value });
+    preview({ ...theme, [key]: value });
+  }
+
+  function save() {
+    startTransition(async () => setFeedback(await saveSiteTheme(theme)));
   }
 
   function reset() {
     setTheme(DEFAULT_THEME);
-    forgetTheme();
-    // Retire les surcharges inline -> retour aux valeurs de globals.css.
-    const root = document.documentElement;
-    for (const { key } of THEME_TOKENS) root.style.removeProperty(`--${key}`);
+    applyTheme(DEFAULT_THEME);
+    startTransition(async () => setFeedback(await resetSiteTheme()));
   }
 
   return (
@@ -66,7 +64,7 @@ export function ThemeCustomizer() {
               <li key={preset.name}>
                 <button
                   type="button"
-                  onClick={() => update({ ...preset.theme })}
+                  onClick={() => preview({ ...preset.theme })}
                   aria-pressed={active}
                   className={`flex w-full flex-col gap-2 rounded-xl border p-3 text-left transition-colors duration-150 ${
                     active
@@ -104,19 +102,9 @@ export function ThemeCustomizer() {
 
       {/* Réglage fin par jeton */}
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">
-            Réglage détaillé
-          </h2>
-          <button
-            type="button"
-            onClick={reset}
-            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-          >
-            <RotateCcw className="size-3.5" aria-hidden />
-            Réinitialiser
-          </button>
-        </div>
+        <h2 className="text-sm font-semibold text-muted-foreground">
+          Réglage détaillé
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {THEME_TOKENS.map(({ key, label, hint }) => (
             <div
@@ -151,17 +139,41 @@ export function ThemeCustomizer() {
       </section>
 
       <Preview />
+
+      {/* Barre d'action : sauvegarde globale */}
+      <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card/95 p-3 backdrop-blur">
+        <button
+          type="button"
+          onClick={save}
+          disabled={pending}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+        >
+          <Globe className="size-4" aria-hidden />
+          {pending ? "…" : "Appliquer à tout le site"}
+        </button>
+        <button
+          type="button"
+          onClick={reset}
+          disabled={pending}
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground disabled:opacity-50"
+        >
+          <RotateCcw className="size-4" aria-hidden />
+          Réinitialiser
+        </button>
+        {feedback.error && (
+          <span role="alert" className="text-sm text-destructive">
+            {feedback.error}
+          </span>
+        )}
+        {feedback.success && (
+          <span className="text-sm text-accent">{feedback.success}</span>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">
+          L&apos;aperçu est immédiat ; « Appliquer » enregistre pour tout le monde.
+        </span>
+      </div>
     </div>
   );
-}
-
-function matchPreset(theme: Theme): string | null {
-  for (const preset of THEME_PRESETS) {
-    if (THEME_TOKENS.every(({ key }) => preset.theme[key] === theme[key])) {
-      return preset.name;
-    }
-  }
-  return null;
 }
 
 function Swatch({ color }: { color: string }) {

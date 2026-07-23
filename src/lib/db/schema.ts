@@ -272,3 +272,16 @@ export const nodeMeta = pgTable("node_meta", {
 });
 
 export type NodeMeta = typeof nodeMeta.$inferSelect;
+
+/**
+ * Réglages globaux du site, une seule ligne (id = "global"). `theme` = palette
+ * de couleurs appliquée à tout le monde (jetons -> code hexa), null = valeurs
+ * par défaut de globals.css.
+ */
+export const appSettings = pgTable("app_settings", {
+  id: varchar("id", { length: 16 }).primaryKey().default("global"),
+  theme: jsonb("theme").$type<Record<string, string>>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type AppSettings = typeof appSettings.$inferSelect;

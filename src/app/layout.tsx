@@ -1,5 +1,8 @@
+import type { CSSProperties } from "react";
 import type { Metadata, Viewport } from "next";
 import { Fira_Code, Fira_Sans } from "next/font/google";
+import { getSiteTheme } from "@/lib/theme-server";
+import { themeStyle } from "@/lib/theme";
 import "./globals.css";
 
 const firaSans = Fira_Sans({
@@ -27,27 +30,22 @@ export const viewport: Viewport = {
   themeColor: "#020617",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Palette globale choisie en administration, posée en variables CSS sur
+  // <html> au rendu serveur : appliquée à tout le monde, sans flash ni JS.
+  const themeVars = themeStyle(await getSiteTheme()) as CSSProperties;
+
   return (
     <html
       lang="fr"
+      style={themeVars}
       className={`${firaSans.variable} ${firaCode.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        {/* Applique la palette enregistrée avant le premier rendu, pour éviter
-            un flash de la couleur par défaut. Doit rester synchro avec
-            THEME_TOKENS / THEME_STORAGE_KEY (lib/theme.ts). */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=JSON.parse(localStorage.getItem('lossnear:theme')||'{}');var k=['background','foreground','card','card-hover','muted','muted-foreground','border','accent','accent-foreground','warning','destructive','info'];for(var i=0;i<k.length;i++){var v=t[k[i]];if(typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v))document.documentElement.style.setProperty('--'+k[i],v);}}catch(e){}`,
-          }}
-        />
-        {children}
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

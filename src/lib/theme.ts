@@ -1,11 +1,9 @@
 /**
- * Thème personnalisable côté navigateur. Les couleurs vivent dans des variables
- * CSS (:root de globals.css) ; on les surcharge à l'exécution en posant les
- * mêmes variables en inline sur <html>. Rien côté serveur : c'est une
- * préférence locale, mémorisée en localStorage, testable en temps réel.
+ * Thème de couleurs global du site. Les couleurs vivent dans des variables CSS
+ * (:root de globals.css). L'administration en choisit une palette, stockée en
+ * base et appliquée à tout le monde : le layout racine pose ces variables sur
+ * <html> au rendu serveur (pas de flash, pas de JS requis).
  */
-
-export const THEME_STORAGE_KEY = "lossnear:theme";
 
 /** Jetons de couleur modifiables, dans l'ordre d'affichage du personnalisateur. */
 export const THEME_TOKENS = [
@@ -136,7 +134,45 @@ export const THEME_PRESETS: { name: string; theme: Theme }[] = [
   },
 ];
 
-/** Applique un thème sur <html> (surcharge inline des variables CSS). */
+const HEX_RE = /^#[0-9a-f]{6}$/i;
+
+/**
+ * Ne garde que des couples jeton connu -> hexa valide. Sert de garde à la
+ * lecture (base) comme à l'écriture (action serveur).
+ */
+export function sanitizeTheme(input: unknown): Partial<Theme> {
+  if (!input || typeof input !== "object") return {};
+  const raw = input as Record<string, unknown>;
+  const out: Partial<Theme> = {};
+  for (const { key } of THEME_TOKENS) {
+    const v = raw[key];
+    if (typeof v === "string" && HEX_RE.test(v)) out[key] = v;
+  }
+  return out;
+}
+
+/** Complète une palette partielle avec le défaut pour obtenir un thème plein. */
+export function resolveTheme(partial: Partial<Theme> | null | undefined): Theme {
+  return { ...DEFAULT_THEME, ...(partial ?? {}) };
+}
+
+/**
+ * Style inline pour <html> : une déclaration `--jeton: valeur` par couleur qui
+ * diffère du défaut (inutile de répéter les valeurs déjà dans globals.css).
+ */
+export function themeStyle(partial: Partial<Theme> | null | undefined): Record<string, string> {
+  const style: Record<string, string> = {};
+  const clean = sanitizeTheme(partial);
+  for (const { key } of THEME_TOKENS) {
+    const v = clean[key];
+    if (v && v.toLowerCase() !== DEFAULT_THEME[key].toLowerCase()) {
+      style[`--${key}`] = v;
+    }
+  }
+  return style;
+}
+
+/** Applique un thème sur <html> côté client (aperçu en direct). */
 export function applyTheme(theme: Partial<Theme>): void {
   const root = document.documentElement;
   for (const { key } of THEME_TOKENS) {
@@ -146,42 +182,12 @@ export function applyTheme(theme: Partial<Theme>): void {
   }
 }
 
-/** Retire toute surcharge : retour aux valeurs de globals.css. */
-export function clearTheme(): void {
-  const root = document.documentElement;
-  for (const { key } of THEME_TOKENS) root.style.removeProperty(`--${key}`);
-}
-
-/** Lit le thème enregistré (ou null). Tolère un JSON corrompu. */
-export function readStoredTheme(): Partial<Theme> | null {
-  try {
-    const raw = localStorage.getItem(THEME_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const out: Partial<Theme> = {};
-    for (const { key } of THEME_TOKENS) {
-      const v = parsed[key];
-      if (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v)) out[key] = v;
+/** Nom de la palette exactement égale au thème donné, sinon null. */
+export function matchPreset(theme: Theme): string | null {
+  for (const preset of THEME_PRESETS) {
+    if (THEME_TOKENS.every(({ key }) => preset.theme[key] === theme[key])) {
+      return preset.name;
     }
-    return Object.keys(out).length ? out : null;
-  } catch {
-    return null;
   }
-}
-
-export function storeTheme(theme: Theme): void {
-  try {
-    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(theme));
-  } catch {
-    // stockage indisponible (navigation privée) — la préférence ne survivra
-    // pas au rechargement, mais l'aperçu en direct fonctionne quand même.
-  }
-}
-
-export function forgetTheme(): void {
-  try {
-    localStorage.removeItem(THEME_STORAGE_KEY);
-  } catch {
-    // rien à faire
-  }
+  return null;
 }
