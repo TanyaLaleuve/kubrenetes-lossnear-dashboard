@@ -39,11 +39,11 @@ function CopyField({
           type="button"
           onClick={copy}
           aria-label={`Copier : ${label}`}
-          className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-accent"
+          className="inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-success"
         >
           {copied ? (
             <>
-              <Check className="size-3.5 text-accent" aria-hidden />
+              <Check className="size-3.5 text-success" aria-hidden />
               Copié
             </>
           ) : (
@@ -96,10 +96,10 @@ export function SftpInfo({
   return (
     <section
       aria-label="Accès SFTP"
-      className="rounded-xl border border-accent/30 bg-accent/5 p-4"
+      className="rounded-xl border border-success/30 bg-success/5 p-4"
     >
       <div className="mb-3 flex items-center gap-2">
-        <Server className="size-4 text-accent" aria-hidden />
+        <Server className="size-4 text-success" aria-hidden />
         <h2 className="text-sm font-semibold">Accès SFTP</h2>
       </div>
 
@@ -122,7 +122,7 @@ export function SftpInfo({
       <a
         href={url}
         onClick={handleOpen}
-        className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity duration-150 hover:opacity-90"
+        className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-success px-4 py-2 text-sm font-semibold text-background transition-opacity duration-150 hover:opacity-90"
       >
         <ExternalLink className="size-4" aria-hidden />
         Ouvrir dans l&apos;app SFTP

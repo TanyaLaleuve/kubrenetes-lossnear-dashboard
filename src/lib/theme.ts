@@ -19,6 +19,7 @@ export const THEME_TOKENS = [
   { key: "warning", label: "Avertissement", hint: "États en attente" },
   { key: "destructive", label: "Danger", hint: "Suppression, erreurs" },
   { key: "info", label: "Info", hint: "Informations neutres" },
+  { key: "success", label: "Succès", hint: "Encart SFTP, confirmations" },
 ] as const;
 
 export type ThemeToken = (typeof THEME_TOKENS)[number]["key"];
@@ -38,6 +39,7 @@ export const DEFAULT_THEME: Theme = {
   warning: "#fcd34d",
   destructive: "#ef4444",
   info: "#818cf8",
+  success: "#22c55e",
 };
 
 /** Palettes prêtes à l'emploi. La première est le thème par défaut. */
@@ -77,6 +79,7 @@ export const THEME_PRESETS: { name: string; theme: Theme }[] = [
       warning: "#fcd34d",
       destructive: "#f87171",
       info: "#7dd3fc",
+      success: "#4ade80",
     },
   },
   {
@@ -94,6 +97,7 @@ export const THEME_PRESETS: { name: string; theme: Theme }[] = [
       warning: "#fcd34d",
       destructive: "#f87171",
       info: "#7dd3fc",
+      success: "#4ade80",
     },
   },
   {
@@ -111,6 +115,7 @@ export const THEME_PRESETS: { name: string; theme: Theme }[] = [
       warning: "#fcd34d",
       destructive: "#f87171",
       info: "#7dd3fc",
+      success: "#4ade80",
     },
   },
   {

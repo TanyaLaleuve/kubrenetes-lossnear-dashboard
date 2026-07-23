@@ -212,6 +212,9 @@ function Preview() {
           <span className="rounded-full border border-info/30 bg-info/15 px-2.5 py-0.5 text-xs font-medium text-info">
             Info
           </span>
+          <span className="rounded-full border border-success/30 bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success">
+            Succès (SFTP)
+          </span>
         </div>
         <p className="text-sm">
           Texte principal, avec un{" "}

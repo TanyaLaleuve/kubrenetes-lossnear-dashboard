@@ -15,6 +15,8 @@
   --warning: #fcd34d;
   --destructive: #ef4444;
   --info: #818cf8;
+  /* Vert « sûr / connexion chiffrée » : encart SFTP, confirmations. */
+  --success: #22c55e;
 }
 
 @theme inline {
@@ -30,6 +32,7 @@
   --color-warning: var(--warning);
   --color-destructive: var(--destructive);
   --color-info: var(--info);
+  --color-success: var(--success);
   --font-sans: var(--font-fira-sans);
   --font-mono: var(--font-fira-code);
 }
