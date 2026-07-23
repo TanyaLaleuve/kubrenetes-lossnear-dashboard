@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  /* Sombre teinté prune/rose : mêmes valeurs de luminosité qu'avant, teinte
-     décalée du bleu-ardoise vers le rose pour rester cohérent avec l'accent. */
-  --background: #120810;
-  --foreground: #fbf3f8;
-  --card: #1e1019;
-  --card-hover: #291725;
-  --muted: #241320;
-  --muted-foreground: #c2a2b3;
-  --border: #3b2333;
-  --accent: #f9a8d4;
-  --accent-foreground: #2a0a1a;
-  --warning: #f59e0b;
-  --destructive: #f87171;
-  --info: #7dd3fc;
+  /* Thème lossnear : sombre bleu-ardoise, accent bleu clair, touche de jaune
+     pâle en secondaire (warning). */
+  --background: #020617;
+  --foreground: #f8fafc;
+  --card: #0f172a;
+  --card-hover: #16213b;
+  --muted: #1a1e2f;
+  --muted-foreground: #94a3b8;
+  --border: #26334d;
+  --accent: #7dd3fc;
+  --accent-foreground: #04121f;
+  --warning: #fcd34d;
+  --destructive: #ef4444;
+  --info: #818cf8;
 }
 
 @theme inline {
