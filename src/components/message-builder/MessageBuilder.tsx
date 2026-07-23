@@ -24,7 +24,7 @@ import {
 } from "@/lib/messages/payload";
 
 const input =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-accent";
+  "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none transition-colors duration-150 focus:border-accent";
 
 type Tab = "editor" | "variables" | "preview";
 
@@ -98,10 +98,10 @@ export function MessageBuilder({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
       {name && <input type="hidden" name={name} value={JSON.stringify(value)} />}
 
-      <nav className="flex gap-1 rounded-xl border border-border bg-card p-1">
+      <nav className="flex border-b border-border">
         {(
           [
             ["editor", "Éditeur", Pencil],
@@ -113,10 +113,10 @@ export function MessageBuilder({
             key={key}
             type="button"
             onClick={() => setTab(key)}
-            className={`inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150 ${
+            className={`inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 border-b-2 px-3 py-2 text-sm font-medium transition-colors duration-150 ${
               tab === key
-                ? "bg-accent/15 text-accent"
-                : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:bg-card-hover hover:text-foreground"
             }`}
           >
             <Icon className="size-4" aria-hidden />
@@ -126,10 +126,10 @@ export function MessageBuilder({
       </nav>
 
       {tab === "editor" && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
+        <div className="grid lg:grid-cols-[1fr_minmax(300px,400px)]">
+          <div className="space-y-2.5 p-3">
             {/* Contenu */}
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <label className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                 <span>Contenu du message</span>
                 <span>
@@ -137,7 +137,7 @@ export function MessageBuilder({
                 </span>
               </label>
               <textarea
-                rows={3}
+                rows={2}
                 maxLength={CONTENT_LIMIT}
                 placeholder="Texte du message (hors embed)…"
                 className={input}
@@ -160,7 +160,7 @@ export function MessageBuilder({
               <button
                 type="button"
                 onClick={addEmbed}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
               >
                 <Plus className="size-4" aria-hidden />
                 Ajouter un embed
@@ -168,8 +168,13 @@ export function MessageBuilder({
             )}
           </div>
 
-          <div className="hidden lg:block">
-            <div className="sticky top-4">
+          {/* Aperçu attaché (desktop) — séparé par un trait. */}
+          <div className="hidden border-l border-border bg-background/40 lg:block">
+            <div className="sticky top-0 space-y-1.5 p-3">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Eye className="size-3.5" aria-hidden />
+                Aperçu en direct
+              </p>
               <DiscordMessagePreview
                 payload={value}
                 variables={variables}
@@ -182,7 +187,7 @@ export function MessageBuilder({
       )}
 
       {tab === "variables" && (
-        <div className="space-y-2 rounded-xl border border-border bg-card p-4">
+        <div className="space-y-2 p-3">
           <p className="text-xs text-muted-foreground">
             Clique une variable pour l&apos;insérer dans le dernier champ édité
             (sinon dans le contenu). Elle sera remplacée par sa vraie valeur à
@@ -190,10 +195,7 @@ export function MessageBuilder({
           </p>
           <ul className="divide-y divide-border">
             {variables.map((v) => (
-              <li
-                key={v.key}
-                className="flex items-center gap-3 py-2"
-              >
+              <li key={v.key} className="flex items-center gap-3 py-1.5">
                 <button
                   type="button"
                   onClick={() => insertVariable(v.key)}
@@ -214,12 +216,14 @@ export function MessageBuilder({
       )}
 
       {tab === "preview" && (
-        <DiscordMessagePreview
-          payload={value}
-          variables={variables}
-          botName={botName}
-          botAvatar={botAvatar}
-        />
+        <div className="p-3">
+          <DiscordMessagePreview
+            payload={value}
+            variables={variables}
+            botName={botName}
+            botAvatar={botAvatar}
+          />
+        </div>
       )}
     </div>
   );
@@ -255,7 +259,7 @@ function EmbedEditor({
 
   return (
     <div className="overflow-hidden rounded-xl border border-border">
-      <div className="flex items-center gap-2 border-b border-border bg-card px-3 py-2">
+      <div className="flex items-center gap-2 border-b border-border bg-card px-3 py-1.5">
         <span
           className="size-3 shrink-0 rounded-full"
           style={{ backgroundColor: color }}
@@ -284,7 +288,7 @@ function EmbedEditor({
       </div>
 
       {open && (
-        <div className="space-y-3 p-3">
+        <div className="space-y-2.5 p-2.5">
           <Row>
             <Labeled label="Auteur">
               <input
@@ -387,7 +391,7 @@ function EmbedEditor({
           </label>
 
           {/* Champs (fields) */}
-          <div className="space-y-2 border-t border-border pt-3">
+          <div className="space-y-2 border-t border-border pt-2.5">
             <p className="text-xs font-medium text-muted-foreground">Champs</p>
             {embed.fields.map((f, fi) => (
               <div
@@ -457,12 +461,12 @@ function EmbedEditor({
 }
 
 function Row({ children }: { children: ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2">{children}</div>;
+  return <div className="grid gap-2.5 sm:grid-cols-2">{children}</div>;
 }
 
 function Labeled({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <label className="text-xs font-medium text-muted-foreground">{label}</label>
       {children}
     </div>
