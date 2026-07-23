@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { asc, eq } from "drizzle-orm";
-import { ArrowLeft, Boxes, Egg as EggIcon, Rocket } from "lucide-react";
+import { ArrowLeft, Boxes, Egg as EggIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ServerCreateForm } from "@/components/ServerCreateForm";
 import { EggServerForm } from "@/components/EggServerForm";
+import { EggPicker } from "@/components/EggPicker";
 import { requireView } from "@/lib/auth/user";
 import { canChoosePort } from "@/lib/auth/dashboard-permissions";
 import { portsLabel, userPortBounds } from "@/lib/servers/ports";
@@ -121,8 +122,10 @@ export default async function NewServerPage({
       id: schema.eggs.id,
       name: schema.eggs.name,
       description: schema.eggs.description,
+      category: schema.eggs.category,
     })
-    .from(schema.eggs);
+    .from(schema.eggs)
+    .orderBy(asc(schema.eggs.name));
 
   return (
     <div className="space-y-6">
@@ -134,31 +137,7 @@ export default async function NewServerPage({
             <EggIcon className="size-4" aria-hidden />
             Depuis un template
           </h2>
-          {/* Petites cartes de hauteur juste suffisante (nom + 2 lignes),
-              égalisées par rangée : 2 par ligne sur mobile, jusqu'à 5 sur
-              grand écran. La dernière ligne peut rester incomplète. */}
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {eggs.map((egg) => (
-              <li key={egg.id}>
-                <Link
-                  href={`/servers/new?egg=${egg.id}`}
-                  className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card p-3 transition-colors duration-150 hover:border-accent/40 hover:bg-card-hover"
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Rocket className="size-4 shrink-0 text-accent" aria-hidden />
-                    <span className="truncate text-sm font-semibold">
-                      {egg.name}
-                    </span>
-                  </div>
-                  {egg.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {egg.description}
-                    </p>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <EggPicker eggs={eggs} />
         </section>
       )}
 
