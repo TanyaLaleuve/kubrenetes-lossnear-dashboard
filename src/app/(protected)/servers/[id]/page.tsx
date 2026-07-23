@@ -1,4 +1,4 @@
-import { Play, RotateCw, Skull, Square } from "lucide-react";
+import { ChevronRight, Play, RotateCw, Skull, Square } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ServerActionButton } from "@/components/ServerActionButton";
@@ -152,11 +152,18 @@ export default async function ServerDetailPage({
       </section>
 
       {Object.keys(server.env).length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-4">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <details className="group rounded-xl border border-border bg-card">
+          <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-xs font-medium text-muted-foreground uppercase tracking-wide transition-colors duration-150 hover:text-foreground">
+            <ChevronRight
+              className="size-4 shrink-0 transition-transform duration-150 group-open:rotate-90"
+              aria-hidden
+            />
             Variables d&apos;environnement
-          </p>
-          <dl className="mt-1.5 space-y-1 overflow-x-auto font-mono text-xs">
+            <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] normal-case">
+              {Object.keys(server.env).length}
+            </span>
+          </summary>
+          <dl className="space-y-1 overflow-x-auto border-t border-border p-4 font-mono text-xs">
             {Object.entries(server.env).map(([key, value]) => (
               <div key={key} className="flex gap-2">
                 <dt className="text-accent">{key}=</dt>
@@ -164,7 +171,7 @@ export default async function ServerDetailPage({
               </div>
             ))}
           </dl>
-        </div>
+        </details>
       )}
     </div>
   );
