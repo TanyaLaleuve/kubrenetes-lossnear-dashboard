@@ -9,6 +9,15 @@ import { appsApi, coreApi } from "@/lib/k8s/client";
 import type { Server } from "@/lib/db/schema";
 import { builtinVars, substituteVars } from "./eggs";
 
+/**
+ * Retire les retours chariot Windows : les scripts issus d'eggs Pterodactyl
+ * sont souvent en CRLF, or `\r` en fin de ligne casse sh/ash (une variable
+ * `PROJECT=paper\r` produit une URL invalide, `set -e` avorte l'install).
+ */
+function normalizeScript(text: string): string {
+  return text.replace(/\r\n?/g, "\n");
+}
+
 /** Marqueur écrit après une install réussie : évite de rejouer le script. */
 const INSTALL_MARKER = ".lossnear-installed";
 /** Où l'initContainer d'install monte le volume (façon Pterodactyl). */
@@ -44,8 +53,9 @@ function serverEnvVars(server: Server): Record<string, string> {
 function buildInstallContainer(server: Server): V1Container | null {
   if (!server.startup || !server.installScript) return null;
   const vars = serverEnvVars(server);
-  // Le script d'install de l'egg peut référencer {{VAR}} : on substitue avant.
-  const script = substituteVars(server.installScript, vars);
+  // Le script d'install de l'egg peut référencer {{VAR}} : on substitue avant,
+  // puis on normalise les fins de ligne (eggs Pterodactyl souvent en CRLF).
+  const script = normalizeScript(substituteVars(server.installScript, vars));
   const marker = `${INSTALL_MOUNT}/${INSTALL_MARKER}`;
   const wrapped = [
     `if [ -f '${marker}' ]; then echo '[install] deja installe, skip'; exit 0; fi`,
@@ -75,7 +85,7 @@ function buildMainContainer(server: Server): V1Container {
     // Serveur egg : commande shell (startup) avec substitution {{VAR}}.
     // Serveur image libre : args optionnels (`command`), sinon entrypoint image.
     ...(server.startup
-      ? { command: ["/bin/sh", "-c", substituteVars(server.startup, vars)] }
+      ? { command: ["/bin/sh", "-c", normalizeScript(substituteVars(server.startup, vars))] }
       : server.command
         ? { args: server.command.split(/\s+/).filter(Boolean) }
         : {}),

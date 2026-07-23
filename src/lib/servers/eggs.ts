@@ -109,14 +109,19 @@ export function parsePterodactylEgg(raw: unknown): EggInput {
 
   const install = e.scripts?.installation;
 
+  // Les scripts d'eggs Pterodactyl arrivent souvent en CRLF : un `\r` en fin
+  // de ligne casse sh/ash (URL invalide, `set -e` qui avorte l'install). On
+  // normalise en LF dès l'import.
+  const lf = (s: string) => s.replace(/\r\n?/g, "\n");
+
   return {
     name: e.name.slice(0, 96),
     description: (e.description ?? "").slice(0, 2000),
     author: e.author?.slice(0, 128) ?? null,
     dockerImages,
-    startup: e.startup,
-    stopCommand: e.config?.stop?.trim() ? e.config.stop.trim() : null,
-    installScript: install?.script?.trim() ? install.script : null,
+    startup: lf(e.startup),
+    stopCommand: e.config?.stop?.trim() ? lf(e.config.stop.trim()) : null,
+    installScript: install?.script?.trim() ? lf(install.script) : null,
     installContainer:
       install?.container?.trim() || DEFAULT_INSTALL_CONTAINER,
     installEntrypoint:
