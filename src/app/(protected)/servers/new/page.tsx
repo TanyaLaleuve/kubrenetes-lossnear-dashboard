@@ -134,15 +134,15 @@ export default async function NewServerPage({
             <EggIcon className="size-4" aria-hidden />
             Depuis un template
           </h2>
-          {/* Petites cartes paysage (~16/9) de taille identique : 2 par ligne
-              sur mobile, jusqu'à 5 sur grand écran. La dernière ligne peut
-              rester incomplète. */}
+          {/* Petites cartes de hauteur juste suffisante (nom + 2 lignes),
+              égalisées par rangée : 2 par ligne sur mobile, jusqu'à 5 sur
+              grand écran. La dernière ligne peut rester incomplète. */}
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {eggs.map((egg) => (
               <li key={egg.id}>
                 <Link
                   href={`/servers/new?egg=${egg.id}`}
-                  className="flex aspect-[16/9] flex-col overflow-hidden rounded-xl border border-border bg-card p-3 transition-colors duration-150 hover:border-accent/40 hover:bg-card-hover"
+                  className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-card p-3 transition-colors duration-150 hover:border-accent/40 hover:bg-card-hover"
                 >
                   <div className="flex items-center gap-1.5">
                     <Rocket className="size-4 shrink-0 text-accent" aria-hidden />
