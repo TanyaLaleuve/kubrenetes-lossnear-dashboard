@@ -547,6 +547,11 @@ export async function updateServerGeneralSettings(
     cpuMilli: input.cpuMilli,
     memoryMi: input.memoryMi,
     displayAddress: input.displayAddress || null,
+    // Ligne de démarrage : uniquement avec la permission dédiée (le champ
+    // n'est pas rendu sinon, mais on revalide côté serveur).
+    ...(access.privileged || access.permissions.has("settings.startup_command")
+      ? { startup: String(formData.get("startup") ?? "").trim() || null }
+      : {}),
     updatedAt: new Date(),
   };
 
@@ -586,8 +591,9 @@ export async function updateServerEggSettings(
   const serverId = String(formData.get("serverId") ?? "");
   const server = await requireServerPermission(user, serverId, "settings.egg");
 
+  // La ligne de démarrage n'est pas modifiable ici : elle se change depuis
+  // les paramètres généraux, avec la permission settings.startup_command.
   const image = String(formData.get("image") ?? "").trim();
-  const startup = String(formData.get("startup") ?? "").trim();
 
   if (!image) return { error: "L'image Docker ne peut pas être vide." };
 
@@ -619,7 +625,6 @@ export async function updateServerEggSettings(
     .update(schema.servers)
     .set({
       image,
-      startup: startup || server.startup,
       env: currentEnv,
       updatedAt: new Date(),
     })

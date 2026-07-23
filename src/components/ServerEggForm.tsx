@@ -20,7 +20,6 @@ export function ServerEggForm({
     {},
   );
 
-  const [startup, setStartup] = useState(server.startup ?? egg?.startup ?? "");
   const [selectedImage, setSelectedImage] = useState(server.image);
 
   // Reconstituer l'environnement actuel pour l'affichage / substitution des variables
@@ -34,6 +33,8 @@ export function ServerEggForm({
     ...server.env,
   };
 
+  // Ligne de démarrage : lecture seule ici, modifiable depuis Paramètres.
+  const startup = server.startup ?? egg?.startup ?? "";
   const startupPreview = substituteVars(startup, previewVars);
 
   return (
@@ -92,26 +93,25 @@ export function ServerEggForm({
         )}
       </div>
 
-      {/* Commande de démarrage */}
+      {/* Ligne de démarrage : aperçu seul, modifiable depuis Paramètres. */}
       <div className="space-y-2">
-        <label htmlFor="startup" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-          <Terminal className="size-3.5" /> Commande de démarrage (Startup)
-        </label>
-        <textarea
-          id="startup"
-          name="startup"
-          rows={3}
-          value={startup}
-          onChange={(e) => setStartup(e.target.value)}
-          disabled={!canEdit}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
-        />
-        {startup && (
-          <div className="rounded-lg border border-border/60 bg-background/50 p-3 space-y-1">
-            <span className="text-[11px] font-semibold text-muted-foreground">Aperçu résolu de la commande :</span>
-            <p className="font-mono text-xs text-accent break-all">{startupPreview || "(vide)"}</p>
-          </div>
-        )}
+        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <Terminal className="size-3.5" /> Ligne de démarrage
+        </span>
+        <div className="space-y-1 rounded-lg border border-border/60 bg-background/50 p-3">
+          <p className="font-mono text-xs break-all text-accent">
+            {startupPreview || "(aucune)"}
+          </p>
+          {startup && startup !== startupPreview && (
+            <p className="font-mono text-[11px] break-all text-muted-foreground">
+              modèle : {startup}
+            </p>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Générée à partir des variables ci-dessous. Modifiable uniquement
+          depuis Paramètres, avec la permission dédiée.
+        </p>
       </div>
 
       {/* Variables de l'Egg */}

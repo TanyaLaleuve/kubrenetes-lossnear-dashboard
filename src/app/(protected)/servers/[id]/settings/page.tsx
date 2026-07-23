@@ -48,6 +48,9 @@ export default async function ServerSettingsGeneralPage({
         users={usersList}
         ownerUsername={ownerRow[0]?.username ?? "?"}
         canEdit={canEdit}
+        canEditStartupCommand={
+          access.privileged || access.permissions.has("settings.startup_command")
+        }
         isPrivileged={access.privileged}
         canChoosePort={canChoosePort(user)}
         portMin={bounds.min}

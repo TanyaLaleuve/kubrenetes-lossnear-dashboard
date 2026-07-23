@@ -32,6 +32,21 @@
   --font-mono: var(--font-fira-code);
 }
 
+/*
+ * Zoom global : Tailwind exprime tailles de texte et espacements en rem, donc
+ * augmenter la racine agrandit tout de façon homogène (textes, boutons,
+ * marges) sans retoucher chaque composant.
+ */
+html {
+  font-size: 17px;
+}
+
+@media (min-width: 1280px) {
+  html {
+    font-size: 18px;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

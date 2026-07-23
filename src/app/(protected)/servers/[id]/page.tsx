@@ -175,13 +175,13 @@ export default async function ServerDetailPage({
               Fichiers
             </Link>
           )}
-          {canModifySettings && (
+          {can("members.read") && (
             <Link
-              href={settingsHref}
+              href={`/servers/${server.shortId}/members`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
             >
-              <Settings className="size-4" aria-hidden />
-              Paramètres
+              <Users className="size-4" aria-hidden />
+              Permissions
             </Link>
           )}
           {(privileged || can("settings.egg")) && (
@@ -193,13 +193,13 @@ export default async function ServerDetailPage({
               Startup
             </Link>
           )}
-          {can("members.read") && (
+          {canModifySettings && (
             <Link
-              href={`/servers/${server.shortId}/members`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+              href={settingsHref}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
             >
-              <Users className="size-4" aria-hidden />
-              Permissions
+              <Settings className="size-4" aria-hidden />
+              Paramètres
             </Link>
           )}
         </section>
