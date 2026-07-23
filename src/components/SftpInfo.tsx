@@ -72,6 +72,26 @@ export function SftpInfo({
   // Les deux champs prennent la largeur du plus long : la police est
   // monospace, donc 1 caractère = 1ch, + 1rem pour le padding horizontal.
   const widthCh = Math.max(url.length, username.length);
+  const [noHandler, setNoHandler] = useState(false);
+
+  /**
+   * Un lien `sftp://` ne fait rien si aucun logiciel n'est associé au schéma
+   * sur la machine, et le navigateur n'affiche aucune erreur. Heuristique
+   * classique : si la fenêtre ne perd pas le focus dans la seconde qui suit le
+   * clic, c'est qu'aucune application n'a été lancée — on l'explique alors.
+   */
+  function handleOpen() {
+    setNoHandler(false);
+    let launched = false;
+    const onBlur = () => {
+      launched = true;
+    };
+    window.addEventListener("blur", onBlur, { once: true });
+    window.setTimeout(() => {
+      window.removeEventListener("blur", onBlur);
+      if (!launched) setNoHandler(true);
+    }, 1200);
+  }
 
   return (
     <section
@@ -101,11 +121,27 @@ export function SftpInfo({
 
       <a
         href={url}
+        onClick={handleOpen}
         className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity duration-150 hover:opacity-90"
       >
         <ExternalLink className="size-4" aria-hidden />
         Ouvrir dans l&apos;app SFTP
       </a>
+
+      {noHandler && (
+        <p
+          role="status"
+          className="mt-3 rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground"
+        >
+          Rien ne s&apos;est ouvert : aucun logiciel n&apos;est associé aux liens{" "}
+          <code className="font-mono">sftp://</code> sur cet appareil. C&apos;est
+          normal avec FileZilla, qui n&apos;enregistre pas ce type de lien —
+          copie le lien et l&apos;identifiant ci-dessus dans ton client.{" "}
+          <strong>WinSCP</strong> (Windows), lui, s&apos;associe aux liens{" "}
+          <code className="font-mono">sftp://</code> à l&apos;installation et
+          rendra ce bouton fonctionnel.
+        </p>
+      )}
 
       <p className="mt-3 text-xs text-muted-foreground">
         Le bouton ouvre ton client SFTP par défaut (FileZilla, WinSCP…) s&apos;il
