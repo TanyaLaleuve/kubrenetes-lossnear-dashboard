@@ -1,15 +1,18 @@
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { ServerEggForm } from "@/components/ServerEggForm";
+import { ServerHeader } from "@/components/ServerHeader";
+import { ServerNav } from "@/components/ServerNav";
 import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 import { serverAccess } from "@/lib/servers/authz";
+import { serverNavProps } from "@/lib/servers/nav";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Startup" };
 
-export default async function ServerSettingsEggPage({
+export default async function ServerStartupPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -34,6 +37,13 @@ export default async function ServerSettingsEggPage({
 
   return (
     <div className="space-y-6">
+      <ServerHeader
+        name={access.server.name}
+        subtitle="Image Docker et variables de démarrage"
+      />
+
+      <ServerNav {...serverNavProps(access)} />
+
       <ServerEggForm server={access.server} egg={egg} canEdit={canEdit} />
     </div>
   );

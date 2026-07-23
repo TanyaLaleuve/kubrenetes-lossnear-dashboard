@@ -633,7 +633,7 @@ export async function updateServerEggSettings(
 
   await updateServerWorkload(updated);
   revalidatePath(`/servers/${serverId}`);
-  revalidatePath(`/servers/${serverId}/settings/startup`);
+  revalidatePath(`/servers/${server.shortId}/startup`);
   return { success: "Configuration enregistrée." };
 }
 
@@ -703,7 +703,6 @@ export async function reinstallServerAction(
 // ---- Membres d'un serveur (sous-utilisateurs) ----
 
 const createSubUserSchema = z.object({
-  serverId: z.string().uuid(),
   username: z
     .string()
     .trim()
@@ -727,10 +726,9 @@ export async function createSubUser(
 ): Promise<ServerFormState> {
   const user = await currentUser();
   const serverId = String(formData.get("serverId") ?? "");
-  await requireServerPermission(user, serverId, "members.manage");
+  const server = await requireServerPermission(user, serverId, "members.manage");
 
   const parsed = createSubUserSchema.safeParse({
-    serverId,
     username: formData.get("username"),
     password: formData.get("password"),
   });
@@ -761,7 +759,7 @@ export async function createSubUser(
         .returning({ id: schema.users.id });
 
       await tx.insert(schema.serverMembers).values({
-        serverId,
+        serverId: server.id,
         userId: created.id,
         permissions: sanitizePermissions(DEFAULT_MEMBER_PERMISSIONS),
       });
@@ -773,16 +771,17 @@ export async function createSubUser(
     throw error;
   }
 
-  revalidateMemberPages(serverId);
+  revalidateMemberPages(server);
   return { success: `Compte « ${input.username} » créé et ajouté au serveur.` };
 }
 
 /**
- * Rafraîchit les deux pages qui listent les membres : l'onglet Permissions des
- * paramètres et la page /members historique.
+ * Rafraîchit la page des membres. Les URLs portent l'identifiant court, mais
+ * les formulaires envoient l'UUID : on rafraîchit les deux.
  */
-function revalidateMemberPages(serverId: string) {
-  revalidatePath(`/servers/${serverId}/members`);
+function revalidateMemberPages(server: { id: string; shortId: string }) {
+  revalidatePath(`/servers/${server.shortId}/members`);
+  revalidatePath(`/servers/${server.id}/members`);
 }
 
 /** Invite un membre par nom d'utilisateur (permissions par défaut). */
@@ -810,7 +809,7 @@ export async function addMember(
   await db()
     .insert(schema.serverMembers)
     .values({
-      serverId,
+      serverId: server.id,
       userId: target.id,
       permissions: sanitizePermissions(
         (await import("./permissions")).DEFAULT_MEMBER_PERMISSIONS,
@@ -818,7 +817,7 @@ export async function addMember(
     })
     .onConflictDoNothing();
 
-  revalidateMemberPages(serverId);
+  revalidateMemberPages(server);
   return { success: `« ${identifier} » ajouté au serveur.` };
 }
 
@@ -829,7 +828,7 @@ export async function updateMemberPermissions(
   const user = await currentUser();
   const serverId = String(formData.get("serverId") ?? "");
   const memberId = String(formData.get("memberId") ?? "");
-  await requireServerPermission(user, serverId, "members.manage");
+  const server = await requireServerPermission(user, serverId, "members.manage");
 
   // Les cases cochées arrivent comme entrées "perm" multiples.
   const permissions = sanitizePermissions(formData.getAll("perm").map(String));
@@ -839,26 +838,26 @@ export async function updateMemberPermissions(
     .set({ permissions, updatedAt: new Date() })
     .where(
       and(
-        eq(schema.serverMembers.serverId, serverId),
+        eq(schema.serverMembers.serverId, server.id),
         eq(schema.serverMembers.userId, memberId),
       ),
     );
-  revalidateMemberPages(serverId);
+  revalidateMemberPages(server);
   return { success: "Permissions enregistrées." };
 }
 
 export async function removeMember(serverId: string, memberId: string) {
   const user = await currentUser();
-  await requireServerPermission(user, serverId, "members.manage");
+  const server = await requireServerPermission(user, serverId, "members.manage");
   await db()
     .delete(schema.serverMembers)
     .where(
       and(
-        eq(schema.serverMembers.serverId, serverId),
+        eq(schema.serverMembers.serverId, server.id),
         eq(schema.serverMembers.userId, memberId),
       ),
     );
-  revalidateMemberPages(serverId);
+  revalidateMemberPages(server);
 }
 
 // ---- Administration (droits + quotas) ----

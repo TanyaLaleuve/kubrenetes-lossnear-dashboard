@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { HardDrive, Sliders, Terminal } from "lucide-react";
+import { HardDrive, Sliders } from "lucide-react";
 
 export function SettingsNav({
   serverId,
   tabs: allowed,
 }: {
   serverId: string;
-  tabs: { general: boolean; startup: boolean; management: boolean };
+  tabs: { general: boolean; management: boolean };
 }) {
   const pathname = usePathname();
 
@@ -20,13 +20,6 @@ export function SettingsNav({
       label: "Général",
       icon: Sliders,
       show: allowed.general,
-    },
-    {
-      href: `/servers/${serverId}/settings/startup`,
-      exact: false,
-      label: "Startup",
-      icon: Terminal,
-      show: allowed.startup,
     },
     {
       href: `/servers/${serverId}/settings/management`,

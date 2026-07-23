@@ -1,20 +1,11 @@
-import Link from "next/link";
-import {
-  ArrowLeft,
-  FolderOpen,
-  Play,
-  RotateCw,
-  Settings,
-  Terminal,
-  Skull,
-  Square,
-  Users,
-} from "lucide-react";
+import { Play, RotateCw, Skull, Square } from "lucide-react";
 import { redirect } from "next/navigation";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { ServerActionButton } from "@/components/ServerActionButton";
 import { ServerAddress } from "@/components/ServerAddress";
 import { ServerConsole } from "@/components/ServerConsole";
+import { ServerHeader } from "@/components/ServerHeader";
+import { ServerNav } from "@/components/ServerNav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { currentUser } from "@/lib/auth/user";
 import {
@@ -24,6 +15,7 @@ import {
   stopServer,
 } from "@/lib/servers/actions";
 import { serverAccess } from "@/lib/servers/authz";
+import { serverNavProps } from "@/lib/servers/nav";
 import { PUBLIC_IP } from "@/lib/servers/constants";
 import { SERVERS_NAMESPACE, serverRuntimeStatus } from "@/lib/servers/k8s";
 import { podMetrics } from "@/lib/k8s/resources";
@@ -56,22 +48,6 @@ export default async function ServerDetailPage({
     can("control.stop") ||
     can("control.restart") ||
     can("control.kill");
-  // Paramètres : visible seulement si quelque chose y est réellement
-  // modifiable (members.read seul n'ouvre qu'une vue lecture -> ne compte pas).
-  const canModifySettings =
-    privileged ||
-    can("settings.general") ||
-    can("settings.egg") ||
-    can("settings.manage") ||
-    can("members.manage");
-  const canAnyManage = can("files.read") || can("members.read") || canModifySettings;
-  // Onglet Paramètres cible : le premier accessible (même ordre que
-  // SettingsNav), pour ne pas atterrir sur Général sans la permission.
-  const settingsHref = privileged || can("settings.general")
-    ? `/servers/${server.shortId}/settings`
-    : can("settings.egg")
-      ? `/servers/${server.shortId}/settings/startup`
-      : `/servers/${server.shortId}/settings/management`;
 
   const status = await serverRuntimeStatus(server).catch(() => ({
     label: "Error" as const,
@@ -93,70 +69,14 @@ export default async function ServerDetailPage({
   return (
     <div className="space-y-6">
       <AutoRefresh seconds={10} />
-      <header className="flex flex-wrap items-center gap-3">
-        <Link
-          href="/servers"
-          aria-label="Retour aux serveurs"
-          className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate font-mono text-lg font-semibold">
-            {server.name}
-          </h1>
-          <p className="truncate text-xs text-muted-foreground">
-            {server.image} · créé {formatAge(server.createdAt)}
-          </p>
-        </div>
+      <ServerHeader
+        name={server.name}
+        subtitle={`${server.image} · créé ${formatAge(server.createdAt)}`}
+      >
         <StatusBadge label={status.label} tone={status.tone} />
-      </header>
+      </ServerHeader>
 
-      {/* Gestion : fichiers, permissions, startup, paramètres. Suppression et
-          changement de propriétaire déplacés dans Gestion & Migration. */}
-      {canAnyManage && (
-        <section
-          aria-label="Gestion"
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
-        >
-          {can("files.read") && (
-            <Link
-              href={`/servers/${server.shortId}/files`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <FolderOpen className="size-4" aria-hidden />
-              Fichiers
-            </Link>
-          )}
-          {can("members.read") && (
-            <Link
-              href={`/servers/${server.shortId}/members`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <Users className="size-4" aria-hidden />
-              Permissions
-            </Link>
-          )}
-          {(privileged || can("settings.egg")) && (
-            <Link
-              href={`/servers/${server.shortId}/settings/startup`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <Terminal className="size-4" aria-hidden />
-              Startup
-            </Link>
-          )}
-          {canModifySettings && (
-            <Link
-              href={settingsHref}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <Settings className="size-4" aria-hidden />
-              Paramètres
-            </Link>
-          )}
-        </section>
-      )}
+      <ServerNav {...serverNavProps(access)} />
 
       {/* Contrôles d'alimentation : juste au-dessus de la console. */}
       {canAnyControl && (

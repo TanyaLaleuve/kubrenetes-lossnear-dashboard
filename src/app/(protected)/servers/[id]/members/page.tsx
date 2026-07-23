@@ -1,11 +1,12 @@
-import Link from "next/link";
 import { eq, sql } from "drizzle-orm";
-import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { MemberManager } from "@/components/MemberManager";
+import { ServerHeader } from "@/components/ServerHeader";
+import { ServerNav } from "@/components/ServerNav";
 import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 import { serverAccess } from "@/lib/servers/authz";
+import { serverNavProps } from "@/lib/servers/nav";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,10 @@ export default async function ServerMembersPage({
   }
   const canManage = access.permissions.has("members.manage");
 
+  // L'URL porte l'identifiant court : les requêtes et les actions doivent
+  // utiliser l'UUID interne (server_members.server_id est de type uuid).
+  const serverId = access.server.id;
+
   const members = await db()
     .select({
       userId: schema.serverMembers.userId,
@@ -34,29 +39,19 @@ export default async function ServerMembersPage({
     })
     .from(schema.serverMembers)
     .innerJoin(schema.users, eq(schema.users.id, schema.serverMembers.userId))
-    .where(eq(schema.serverMembers.serverId, id));
+    .where(eq(schema.serverMembers.serverId, serverId));
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center gap-3">
-        <Link
-          href={`/servers/${id}`}
-          aria-label="Retour au serveur"
-          className="grid size-9 place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden />
-        </Link>
-        <div className="min-w-0">
-          <h1 className="truncate font-mono text-lg font-semibold">
-            {access.server.name}
-          </h1>
-          <p className="text-xs text-muted-foreground">
-            Membres et permissions
-          </p>
-        </div>
-      </header>
+      <ServerHeader name={access.server.name} subtitle="Membres et permissions" />
 
-      <MemberManager serverId={id} members={members} canManage={canManage} />
+      <ServerNav {...serverNavProps(access)} />
+
+      <MemberManager
+        serverId={serverId}
+        members={members}
+        canManage={canManage}
+      />
     </div>
   );
 }
