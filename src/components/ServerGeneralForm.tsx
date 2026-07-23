@@ -14,7 +14,7 @@ import {
 import { PortCheck } from "@/components/PortCheck";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import { updateServerGeneralSettings, type ServerFormState } from "@/lib/servers/actions";
-import { PUBLIC_IP } from "@/lib/servers/constants";
+import { PUBLIC_HOST } from "@/lib/servers/constants";
 import type { Server as ServerType } from "@/lib/db/schema";
 
 type UserItem = {
@@ -59,8 +59,8 @@ export function ServerGeneralForm({
   const [showPort, setShowPort] = useState(server.showPort);
 
   // Aperçu vivant de ce que verront les joueurs.
-  const publicIp = PUBLIC_IP;
-  const previewAddress = `${domain.trim() || publicIp}${
+  const publicHost = PUBLIC_HOST;
+  const previewAddress = `${domain.trim() || publicHost}${
     showPort ? `:${hostPort || server.hostPort}` : ""
   }`;
 
@@ -275,7 +275,7 @@ export function ServerGeneralForm({
               id="displayAddress"
               name="displayAddress"
               type="text"
-              placeholder={publicIp}
+              placeholder={publicHost}
               data-keep-empty
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
@@ -283,9 +283,13 @@ export function ServerGeneralForm({
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
             />
             <p className="text-[11px] text-muted-foreground">
-              Remplace l&apos;IP partout : adresse de connexion et lien SFTP.
-              Ton domaine doit pointer sur {publicIp} (enregistrement DNS de
-              type A). Vide = l&apos;IP est affichée.
+              Remplace l&apos;adresse par défaut partout : connexion et lien
+              SFTP. Chez ton registrar, fais pointer ton domaine sur{" "}
+              <code className="font-mono">{publicHost}</code> avec un
+              enregistrement <strong>CNAME</strong> — il suivra automatiquement
+              si le serveur déménage, contrairement à un enregistrement A vers
+              une IP fixe. Vide = <code className="font-mono">{publicHost}</code>{" "}
+              est affiché.
             </p>
           </div>
 
