@@ -3,7 +3,16 @@
 import { useState } from "react";
 import { Check, Copy, ExternalLink, Server } from "lucide-react";
 
-function CopyField({ label, value }: { label: string; value: string }) {
+function CopyField({
+  label,
+  value,
+  widthCh,
+}: {
+  label: string;
+  value: string;
+  /** Largeur imposée, en caractères — voir SftpInfo. */
+  widthCh?: number;
+}) {
   const [copied, setCopied] = useState(false);
   async function copy() {
     try {
@@ -17,10 +26,13 @@ function CopyField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      {/* Le bloc de texte s'ajuste à son contenu : le bouton copier reste
-          collé à sa droite au lieu de partir au bout de la carte. */}
+      {/* Le bloc de texte s'ajuste au contenu : le bouton copier reste collé à
+          sa droite au lieu de partir au bout de la carte. */}
       <div className="mt-1 flex items-center gap-1.5">
-        <code className="min-w-0 truncate rounded bg-background px-2 py-1.5 font-mono text-xs">
+        <code
+          style={widthCh ? { width: `calc(${widthCh}ch + 1rem)` } : undefined}
+          className="min-w-0 max-w-full truncate rounded bg-background px-2 py-1.5 font-mono text-xs"
+        >
           {value}
         </code>
         <button
@@ -57,6 +69,9 @@ export function SftpInfo({
 }) {
   // Sans l'identifiant : il est affiché juste en dessous, le lien reste court.
   const url = `sftp://${host}:${port}`;
+  // Les deux champs prennent la largeur du plus long : la police est
+  // monospace, donc 1 caractère = 1ch, + 1rem pour le padding horizontal.
+  const widthCh = Math.max(url.length, username.length);
 
   return (
     <section
@@ -69,8 +84,12 @@ export function SftpInfo({
       </div>
 
       <div className="space-y-3">
-        <CopyField label="Lien SFTP complet" value={url} />
-        <CopyField label="Nom d'utilisateur (ce serveur)" value={username} />
+        <CopyField label="Lien SFTP complet" value={url} widthCh={widthCh} />
+        <CopyField
+          label="Nom d'utilisateur (ce serveur)"
+          value={username}
+          widthCh={widthCh}
+        />
         <div>
           <p className="text-xs text-muted-foreground">Mot de passe</p>
           <p className="mt-1 rounded bg-background px-2 py-1.5 text-xs">
