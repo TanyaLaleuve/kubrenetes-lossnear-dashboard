@@ -10,6 +10,7 @@ import {
   Layers,
   LayoutDashboard,
   LogOut,
+  MessageSquare,
   Package,
   Server,
   SquareStack,
@@ -133,6 +134,12 @@ export function Nav({ user }: { user: NavUser }) {
                 label="Images Docker"
                 icon={Package}
                 active={isActive(pathname, "/images")}
+              />
+              <SidebarLink
+                href="/message-builder"
+                label="Message builder"
+                icon={MessageSquare}
+                active={isActive(pathname, "/message-builder")}
               />
             </>
           )}
