@@ -25,7 +25,7 @@ import {
 } from "@/lib/messages/payload";
 
 const input =
-  "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none transition-colors duration-150 focus:border-accent";
+  "w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none transition-colors duration-150 focus:border-accent disabled:cursor-not-allowed disabled:opacity-50";
 
 type Tab = "editor" | "variables" | "preview";
 
@@ -60,6 +60,9 @@ export function MessageBuilder({
     onChange(JSON.parse(JSON.stringify(defaultPayload)) as MessagePayload);
     setView("current");
   };
+  const editing = view === "current";
+  // Payload affiché dans l'éditeur/aperçu : défaut (lecture seule) ou courant.
+  const displayed = editing ? value : defaultPayload;
   const active = useRef<{
     el: HTMLInputElement | HTMLTextAreaElement;
     set: SetValue;
@@ -79,16 +82,24 @@ export function MessageBuilder({
     onChange({ ...value, embeds: value.embeds.filter((_, idx) => idx !== i) });
 
   // Props communs à tous les champs texte (suivi du champ actif pour l'insertion
-  // de variables au curseur).
-  const bind = (v: string, set: SetValue) => ({
+  // de variables au curseur). `disabled` : champ grisé/bloqué (vue Défaut).
+  const bind = (v: string, set: SetValue, disabled = false) => ({
     value: v,
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      set(e.target.value),
-    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      // Assignation dans un gestionnaire d'événement (pas au render) : sûr.
-      // eslint-disable-next-line react-hooks/refs
-      active.current = { el: e.currentTarget, set };
-    },
+    disabled,
+    ...(disabled
+      ? {}
+      : {
+          onChange: (
+            e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+          ) => set(e.target.value),
+          onFocus: (
+            e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>,
+          ) => {
+            // Assignation dans un gestionnaire d'événement (pas au render).
+            // eslint-disable-next-line react-hooks/refs
+            active.current = { el: e.currentTarget, set };
+          },
+        }),
   });
 
   function insertVariable(key: string) {
@@ -163,39 +174,31 @@ export function MessageBuilder({
         </div>
       )}
 
-      {tab === "editor" && view === "default" && (
-        <div className="space-y-2 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">
-              Message par défaut (lecture seule).
-            </p>
-            <button
-              type="button"
-              onClick={restoreDefault}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <RotateCcw className="size-3.5" aria-hidden />
-              Restaurer ce défaut
-            </button>
-          </div>
-          <DiscordMessagePreview
-            payload={defaultPayload}
-            variables={variables}
-            botName={botName}
-            botAvatar={botAvatar}
-          />
-        </div>
-      )}
-
-      {tab === "editor" && view === "current" && (
+      {tab === "editor" && (
         <div className="grid lg:grid-cols-[1fr_minmax(300px,400px)]">
           <div className="space-y-2.5 p-3">
+            {!editing && (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background/40 px-2.5 py-1.5">
+                <p className="text-xs text-muted-foreground">
+                  Message par défaut — lecture seule.
+                </p>
+                <button
+                  type="button"
+                  onClick={restoreDefault}
+                  className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+                >
+                  <RotateCcw className="size-3.5" aria-hidden />
+                  Restaurer
+                </button>
+              </div>
+            )}
+
             {/* Contenu */}
             <div className="space-y-1">
               <label className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                 <span>Contenu du message</span>
                 <span>
-                  {value.content.length}/{CONTENT_LIMIT}
+                  {displayed.content.length}/{CONTENT_LIMIT}
                 </span>
               </label>
               <textarea
@@ -203,22 +206,23 @@ export function MessageBuilder({
                 maxLength={CONTENT_LIMIT}
                 placeholder="Texte du message (hors embed)…"
                 className={input}
-                {...bind(value.content, setContent)}
+                {...bind(displayed.content, setContent, !editing)}
               />
             </div>
 
-            {value.embeds.map((embed, i) => (
+            {displayed.embeds.map((embed, i) => (
               <EmbedEditor
                 key={i}
                 index={i}
                 embed={embed}
-                bind={bind}
+                disabled={!editing}
+                bind={(v, set) => bind(v, set, !editing)}
                 patch={(p) => patchEmbed(i, p)}
                 remove={() => removeEmbed(i)}
               />
             ))}
 
-            {value.embeds.length < EMBED_LIMIT && (
+            {editing && displayed.embeds.length < EMBED_LIMIT && (
               <button
                 type="button"
                 onClick={addEmbed}
@@ -235,10 +239,10 @@ export function MessageBuilder({
             <div className="sticky top-0 space-y-1.5 p-3">
               <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <Eye className="size-3.5" aria-hidden />
-                Aperçu en direct
+                Aperçu {editing ? "en direct" : "du défaut"}
               </p>
               <DiscordMessagePreview
-                payload={value}
+                payload={displayed}
                 variables={variables}
                 botName={botName}
                 botAvatar={botAvatar}
@@ -309,19 +313,22 @@ export function MessageBuilder({
 function EmbedEditor({
   index,
   embed,
+  disabled,
   bind,
   patch,
   remove,
 }: {
   index: number;
   embed: EmbedData;
+  disabled: boolean;
   bind: (
     v: string,
     set: SetValue,
   ) => {
     value: string;
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
-    onFocus: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    disabled: boolean;
+    onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+    onFocus?: (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
   };
   patch: (p: Partial<EmbedData>) => void;
   remove: () => void;
@@ -354,14 +361,16 @@ function EmbedEditor({
             aria-hidden
           />
         </button>
-        <button
-          type="button"
-          onClick={remove}
-          className="grid size-7 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-destructive"
-          aria-label="Supprimer l'embed"
-        >
-          <Trash2 className="size-4" aria-hidden />
-        </button>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={remove}
+            className="grid size-7 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-destructive"
+            aria-label="Supprimer l'embed"
+          >
+            <Trash2 className="size-4" aria-hidden />
+          </button>
+        )}
       </div>
 
       {open && (
@@ -419,8 +428,9 @@ function EmbedEditor({
                 <input
                   type="color"
                   value={color}
+                  disabled={disabled}
                   onChange={(e) => patch({ color: e.target.value })}
-                  className="size-9 shrink-0 cursor-pointer rounded-lg border border-border bg-background"
+                  className="size-9 shrink-0 cursor-pointer rounded-lg border border-border bg-background disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Couleur de l'embed"
                 />
                 <input
@@ -457,10 +467,11 @@ function EmbedEditor({
             </Labeled>
           </Row>
 
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <label className="flex items-center gap-2 text-sm has-[:disabled]:opacity-50">
             <input
               type="checkbox"
               checked={embed.timestamp}
+              disabled={disabled}
               onChange={(e) => patch({ timestamp: e.target.checked })}
               className="size-4 accent-(--accent)"
             />
@@ -491,29 +502,32 @@ function EmbedEditor({
                     className={input}
                     {...bind(f.value, (v) => setField(fi, { value: v }))}
                   />
-                  <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground has-[:disabled]:opacity-50">
                     <input
                       type="checkbox"
                       checked={f.inline}
+                      disabled={disabled}
                       onChange={(e) => setField(fi, { inline: e.target.checked })}
                       className="size-3.5 accent-(--accent)"
                     />
                     En ligne (côte à côte)
                   </label>
                 </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    patch({ fields: embed.fields.filter((_, idx) => idx !== fi) })
-                  }
-                  className="grid size-7 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-destructive"
-                  aria-label="Supprimer le champ"
-                >
-                  <Trash2 className="size-3.5" aria-hidden />
-                </button>
+                {!disabled && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      patch({ fields: embed.fields.filter((_, idx) => idx !== fi) })
+                    }
+                    className="grid size-7 cursor-pointer place-items-center rounded-lg text-muted-foreground hover:bg-card-hover hover:text-destructive"
+                    aria-label="Supprimer le champ"
+                  >
+                    <Trash2 className="size-3.5" aria-hidden />
+                  </button>
+                )}
               </div>
             ))}
-            {embed.fields.length < FIELD_LIMIT && (
+            {!disabled && embed.fields.length < FIELD_LIMIT && (
               <button
                 type="button"
                 onClick={() =>
