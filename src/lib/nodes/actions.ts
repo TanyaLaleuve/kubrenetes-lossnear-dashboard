@@ -8,10 +8,30 @@ import { currentUser } from "@/lib/auth/user";
 
 export type NodeMetaFormState = { error?: string; success?: string };
 
+/**
+ * Normalise une URL saisie à la main : un domaine nu (« contabo.com ») reçoit
+ * le préfixe https:// pour rester valide, sans imposer à l'admin de le taper.
+ * Ne lève jamais : "" si vide ou si la saisie reste invalide (on préfère
+ * enregistrer sans lien plutôt que bloquer tout le formulaire).
+ */
+function normalizeUrl(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  try {
+    return new URL(withScheme).toString();
+  } catch {
+    return "";
+  }
+}
+
 const metaSchema = z.object({
   nodeName: z.string().trim().min(1).max(255),
   hostingUrl: z
-    .union([z.string().trim().url("URL invalide"), z.literal("")])
+    .string()
+    .trim()
+    .max(255)
+    .transform((v) => normalizeUrl(v))
     .optional(),
   hostingLabel: z.string().trim().max(128).optional(),
   priceAmount: z

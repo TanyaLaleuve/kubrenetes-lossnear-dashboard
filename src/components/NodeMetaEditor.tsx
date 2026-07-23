@@ -64,9 +64,10 @@ export function NodeMetaEditor({
             Lien vers l&apos;hébergeur
             <input
               name="hostingUrl"
-              type="url"
+              type="text"
+              inputMode="url"
               data-keep-empty
-              placeholder="https://…"
+              placeholder="contabo.com ou https://…"
               defaultValue={hostingUrl ?? ""}
               className={inputClass}
             />

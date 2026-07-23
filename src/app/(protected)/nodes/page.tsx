@@ -10,7 +10,7 @@ import {
   parseCpu,
   parseMemory,
 } from "@/lib/k8s/format";
-import { requireView, currentUser } from "@/lib/auth/user";
+import { requireView } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
