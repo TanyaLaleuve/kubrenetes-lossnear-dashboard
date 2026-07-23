@@ -112,7 +112,53 @@ export default async function ServerDetailPage({
         <StatusBadge label={status.label} tone={status.tone} />
       </header>
 
-      {/* Contrôles d'alimentation : selon les permissions de contrôle. */}
+      {/* Gestion : fichiers, permissions, startup, paramètres. Suppression et
+          changement de propriétaire déplacés dans Gestion & Migration. */}
+      {canAnyManage && (
+        <section
+          aria-label="Gestion"
+          className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
+        >
+          {can("files.read") && (
+            <Link
+              href={`/servers/${server.shortId}/files`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <FolderOpen className="size-4" aria-hidden />
+              Fichiers
+            </Link>
+          )}
+          {can("members.read") && (
+            <Link
+              href={`/servers/${server.shortId}/members`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <Users className="size-4" aria-hidden />
+              Permissions
+            </Link>
+          )}
+          {(privileged || can("settings.egg")) && (
+            <Link
+              href={`/servers/${server.shortId}/settings/startup`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <Terminal className="size-4" aria-hidden />
+              Startup
+            </Link>
+          )}
+          {canModifySettings && (
+            <Link
+              href={settingsHref}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <Settings className="size-4" aria-hidden />
+              Paramètres
+            </Link>
+          )}
+        </section>
+      )}
+
+      {/* Contrôles d'alimentation : juste au-dessus de la console. */}
       {canAnyControl && (
         <section
           aria-label="Alimentation"
@@ -155,52 +201,6 @@ export default async function ServerDetailPage({
               <Skull className="size-4" aria-hidden />
               Kill
             </ServerActionButton>
-          )}
-        </section>
-      )}
-
-      {/* Gestion : fichiers, permissions, paramètres. Suppression et
-          changement de propriétaire déplacés dans Gestion & Migration. */}
-      {canAnyManage && (
-        <section
-          aria-label="Gestion"
-          className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
-        >
-          {can("files.read") && (
-            <Link
-              href={`/servers/${server.shortId}/files`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <FolderOpen className="size-4" aria-hidden />
-              Fichiers
-            </Link>
-          )}
-          {can("members.read") && (
-            <Link
-              href={`/servers/${server.shortId}/members`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <Users className="size-4" aria-hidden />
-              Permissions
-            </Link>
-          )}
-          {(privileged || can("settings.egg")) && (
-            <Link
-              href={`/servers/${server.shortId}/settings/startup`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <Terminal className="size-4" aria-hidden />
-              Startup
-            </Link>
-          )}
-          {canModifySettings && (
-            <Link
-              href={settingsHref}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <Settings className="size-4" aria-hidden />
-              Paramètres
-            </Link>
           )}
         </section>
       )}
