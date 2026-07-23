@@ -1,5 +1,6 @@
 import { currentUser } from "@/lib/auth/user";
 import { Nav } from "@/components/Nav";
+import { TopBar } from "@/components/TopBar";
 import { FormPlaceholderDefaults } from "@/components/FormPlaceholderDefaults";
 
 export default async function ProtectedLayout({
@@ -8,8 +9,16 @@ export default async function ProtectedLayout({
   const user = await currentUser();
 
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh pt-14">
       <FormPlaceholderDefaults />
+      <TopBar
+        user={{
+          id: user.id,
+          username: user.username,
+          hasAvatar: user.hasAvatar,
+          avatarVersion: user.updatedAt,
+        }}
+      />
       <Nav
         user={{
           id: user.id,

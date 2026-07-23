@@ -9,14 +9,12 @@ import {
   Gamepad2,
   Layers,
   LayoutDashboard,
-  LogOut,
   MessageSquare,
   Package,
   Server,
   SquareStack,
   Users,
 } from "lucide-react";
-import { logout } from "@/lib/auth/actions";
 import { Avatar } from "@/components/Avatar";
 
 type NavUser = {
@@ -86,12 +84,8 @@ export function Nav({ user }: { user: NavUser }) {
 
   return (
     <>
-      {/* Sidebar desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-56 flex-col border-r border-border bg-card md:flex">
-        <div className="flex h-14 items-center gap-2 border-b border-border px-4">
-          <span className="size-2 rounded-full bg-accent" aria-hidden />
-          <span className="font-mono text-sm font-semibold">lossnear/k8s</span>
-        </div>
+      {/* Sidebar desktop — sous la barre supérieure (h-14). */}
+      <aside className="fixed bottom-0 left-0 top-14 z-40 hidden w-56 flex-col overflow-y-auto border-r border-border bg-card md:flex">
         <nav className="flex-1 space-y-1 p-3" aria-label="Navigation principale">
           {visibleMain.map((link) => (
             <SidebarLink
@@ -144,34 +138,6 @@ export function Nav({ user }: { user: NavUser }) {
             </>
           )}
         </nav>
-        <div className="space-y-1 border-t border-border p-3">
-          <Link
-            href="/profile"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
-              isActive(pathname, "/profile")
-                ? "bg-accent/10 font-medium text-accent"
-                : "text-muted-foreground hover:bg-card-hover hover:text-foreground"
-            }`}
-          >
-            <Avatar
-              userId={user.id}
-              username={user.username}
-              hasAvatar={user.hasAvatar}
-              version={user.avatarVersion}
-              size={24}
-            />
-            <span className="truncate">{user.username}</span>
-          </Link>
-          <form action={logout}>
-            <button
-              type="submit"
-              className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-destructive"
-            >
-              <LogOut className="size-4" aria-hidden />
-              Déconnexion
-            </button>
-          </form>
-        </div>
       </aside>
 
       {/* Bottom nav mobile : 5 entrées max */}
