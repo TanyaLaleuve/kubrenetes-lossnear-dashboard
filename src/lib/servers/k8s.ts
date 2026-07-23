@@ -284,6 +284,27 @@ export async function setReplicas(
   });
 }
 
+/**
+ * Ports hôte déjà réservés par des pods du cluster (tous namespaces).
+ * Complète la vérification en base : un pod hors lossnear peut occuper un port.
+ */
+export async function clusterHostPorts(): Promise<Set<number>> {
+  const ports = new Set<number>();
+  try {
+    const pods = await coreApi().listPodForAllNamespaces();
+    for (const pod of pods.items) {
+      for (const container of pod.spec?.containers ?? []) {
+        for (const port of container.ports ?? []) {
+          if (port.hostPort) ports.add(port.hostPort);
+        }
+      }
+    }
+  } catch {
+    // En cas d'échec on ne bloque pas : la validation base + réservés reste.
+  }
+  return ports;
+}
+
 /** Supprime le pod immédiatement (grace period 0) — arrêt dur. */
 export async function forceDeletePod(slug: string): Promise<void> {
   try {

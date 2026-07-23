@@ -11,7 +11,15 @@ import { requirePrivileged, requireServerPermission, serverAccess } from "./auth
 import { DEFAULT_IMAGE } from "./constants";
 import { DEFAULT_MEMBER_PERMISSIONS, sanitizePermissions } from "./permissions";
 import { builtinVars, EGG_MOUNT_PATH, resolveEnv } from "./eggs";
-import { parsePortSpec, userAllowedPorts } from "./ports";
+import {
+  AUTO_PORT_MAX,
+  AUTO_PORT_MIN,
+  isReservedPort,
+  parsePortSpec,
+  PORT_MAX,
+  PORT_MIN,
+  userAllowedPorts,
+} from "./ports";
 import {
   canChoosePort,
   DEFAULT_DASHBOARD_PERMISSIONS,
@@ -19,11 +27,10 @@ import {
 } from "@/lib/auth/dashboard-permissions";
 import {
   applyServer,
+  clusterHostPorts,
   destroyServer,
   forceDeletePod,
   updateServerWorkload,
-  HOST_PORT_MAX,
-  HOST_PORT_MIN,
   SERVERS_NAMESPACE,
 } from "./k8s";
 
@@ -79,8 +86,8 @@ function optionalHostPort() {
     z
       .coerce.number()
       .int()
-      .min(HOST_PORT_MIN, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`)
-      .max(HOST_PORT_MAX, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`)
+      .min(PORT_MIN, `Port externe : ${PORT_MIN}-${PORT_MAX}`)
+      .max(PORT_MAX, `Port externe : ${PORT_MIN}-${PORT_MAX}`)
       .optional(),
   );
 }
@@ -135,25 +142,97 @@ async function reserveSlot(
     .select({ hostPort: schema.servers.hostPort })
     .from(schema.servers);
   const usedPorts = new Set(used.map((r) => r.hostPort));
+  const clusterPorts = await clusterHostPorts();
+  // null = aucune restriction : n'importe quel port non réservé.
   const allowed = userAllowedPorts(user);
 
-  // Port demandé explicitement : uniquement si l'utilisateur a la permission,
-  // qu'il est autorisé et libre. Sinon on ignore et on attribue automatiquement.
+  // Port demandé explicitement : uniquement si l'utilisateur a la permission.
+  // Sinon on ignore et on attribue automatiquement.
   if (desiredPort != null && canChoosePort(user)) {
-    if (!allowed.includes(desiredPort)) {
-      return { error: `Le port ${desiredPort} ne fait pas partie de tes ports autorisés.` };
-    }
-    if (usedPorts.has(desiredPort)) {
-      return { error: `Le port ${desiredPort} est déjà utilisé par un autre serveur.` };
-    }
+    const problem = portProblem(desiredPort, allowed, usedPorts, clusterPorts);
+    if (problem) return { error: problem };
     return { hostPort: desiredPort };
   }
 
-  // Sinon : premier port libre parmi les ports autorisés.
-  for (const p of allowed) {
-    if (!usedPorts.has(p)) return { hostPort: p };
+  // Sinon : premier port libre — dans la liste allouée si définie, sinon dans
+  // la plage d'attribution automatique (déjà ouverte au pare-feu).
+  const candidates =
+    allowed ??
+    Array.from(
+      { length: AUTO_PORT_MAX - AUTO_PORT_MIN + 1 },
+      (_, i) => AUTO_PORT_MIN + i,
+    );
+  for (const p of candidates) {
+    if (!portProblem(p, allowed, usedPorts, clusterPorts)) return { hostPort: p };
   }
-  return { error: "Plus aucun port disponible dans ta liste allouée." };
+  return {
+    error: allowed
+      ? "Plus aucun port disponible dans ta liste allouée."
+      : `Plus aucun port libre dans la plage d'attribution automatique (${AUTO_PORT_MIN}-${AUTO_PORT_MAX}). Choisis un port manuellement.`,
+  };
+}
+
+/**
+ * Raison pour laquelle un port ne peut pas être pris, ou null s'il est libre.
+ * Partagé par la création, la modification et la vérification en direct.
+ */
+function portProblem(
+  port: number,
+  allowed: number[] | null,
+  usedPorts: Set<number>,
+  clusterPorts: Set<number>,
+): string | null {
+  if (port < PORT_MIN || port > PORT_MAX) {
+    return `Port hors bornes (${PORT_MIN}-${PORT_MAX}).`;
+  }
+  if (isReservedPort(port)) {
+    return `Le port ${port} est réservé (service de l'hôte ou Kubernetes).`;
+  }
+  if (allowed && !allowed.includes(port)) {
+    return `Le port ${port} ne fait pas partie de tes ports autorisés.`;
+  }
+  if (usedPorts.has(port)) {
+    return `Le port ${port} est déjà utilisé par un autre serveur.`;
+  }
+  if (clusterPorts.has(port)) {
+    return `Le port ${port} est déjà occupé sur le nœud.`;
+  }
+  return null;
+}
+
+/** Vérifie en direct la disponibilité d'un port (retour UI immédiat). */
+export async function checkPortAvailability(
+  port: number,
+  serverId?: string,
+): Promise<{ ok: boolean; message: string }> {
+  const user = await currentUser();
+  if (!canChoosePort(user)) {
+    return { ok: false, message: "Tu n'as pas la permission de choisir le port." };
+  }
+  if (!Number.isInteger(port)) {
+    return { ok: false, message: "Port invalide." };
+  }
+
+  const rows = await db()
+    .select({ id: schema.servers.id, hostPort: schema.servers.hostPort })
+    .from(schema.servers);
+  // Le port actuel du serveur édité ne compte pas comme un conflit.
+  const usedPorts = new Set(
+    rows.filter((r) => r.id !== serverId).map((r) => r.hostPort),
+  );
+  const own = rows.find((r) => r.id === serverId)?.hostPort;
+  const clusterPorts = await clusterHostPorts();
+  if (own != null) clusterPorts.delete(own);
+
+  const problem = portProblem(
+    port,
+    userAllowedPorts(user),
+    usedPorts,
+    clusterPorts,
+  );
+  return problem
+    ? { ok: false, message: problem }
+    : { ok: true, message: `Port ${port} disponible.` };
 }
 
 export async function createServer(
@@ -390,8 +469,8 @@ const generalSettingsSchema = z.object({
   hostPort: z.coerce
     .number()
     .int()
-    .min(HOST_PORT_MIN, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`)
-    .max(HOST_PORT_MAX, `Port externe : ${HOST_PORT_MIN}-${HOST_PORT_MAX}`),
+    .min(PORT_MIN, `Port externe : ${PORT_MIN}-${PORT_MAX}`)
+    .max(PORT_MAX, `Port externe : ${PORT_MIN}-${PORT_MAX}`),
   cpuMilli: z.coerce.number().int().min(250).max(16000),
   memoryMi: z.coerce.number().int().min(256).max(32768),
   displayAddress: z.string().trim().max(255).optional(),
@@ -429,28 +508,23 @@ export async function updateServerGeneralSettings(
   // Port externe : modifiable seulement si l'utilisateur a la permission,
   // dans sa plage, et libre. Sinon on garde le port actuel.
   let newHostPort = server.hostPort;
-  if (canChoosePort(user)) {
-    const allowed = userAllowedPorts(user);
-    // On tolère le port actuel même s'il n'est plus dans la liste (allocation
-    // modifiée après coup) ; sinon il doit faire partie des ports autorisés.
-    if (input.hostPort !== server.hostPort && !allowed.includes(input.hostPort)) {
-      return { error: `Le port ${input.hostPort} ne fait pas partie de tes ports autorisés.` };
-    }
-    if (input.hostPort !== server.hostPort) {
-      const clash = await db()
-        .select({ id: schema.servers.id })
-        .from(schema.servers)
-        .where(
-          and(
-            eq(schema.servers.hostPort, input.hostPort),
-            ne(schema.servers.id, server.id),
-          ),
-        )
-        .limit(1);
-      if (clash[0]) {
-        return { error: `Le port ${input.hostPort} est déjà utilisé par un autre serveur.` };
-      }
-    }
+  // On tolère le port actuel inchangé même s'il ne serait plus attribuable
+  // (liste allouée modifiée après coup) : on ne valide qu'en cas de changement.
+  if (canChoosePort(user) && input.hostPort !== server.hostPort) {
+    const others = await db()
+      .select({ id: schema.servers.id, hostPort: schema.servers.hostPort })
+      .from(schema.servers)
+      .where(ne(schema.servers.id, server.id));
+    const clusterPorts = await clusterHostPorts();
+    clusterPorts.delete(server.hostPort); // son propre pod ne compte pas
+
+    const problem = portProblem(
+      input.hostPort,
+      userAllowedPorts(user),
+      new Set(others.map((r) => r.hostPort)),
+      clusterPorts,
+    );
+    if (problem) return { error: problem };
     newHostPort = input.hostPort;
   }
 

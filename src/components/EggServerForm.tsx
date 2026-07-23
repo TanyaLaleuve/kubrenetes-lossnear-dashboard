@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
+import { PortCheck } from "@/components/PortCheck";
 import {
   createServerFromEgg,
   type ServerFormState,
@@ -41,6 +42,7 @@ export function EggServerForm({
     createServerFromEgg,
     initialState,
   );
+  const [hostPort, setHostPort] = useState("");
 
   const imageEntries = Object.entries(egg.dockerImages);
   const editable = egg.variables.filter((v) => v.userViewable);
@@ -189,8 +191,11 @@ export function EggServerForm({
               max={portMax}
               placeholder="auto"
               data-keep-empty
+              value={hostPort}
+              onChange={(e) => setHostPort(e.target.value)}
               className={inputClass}
             />
+            <PortCheck port={hostPort} />
           </div>
         )}
       </fieldset>

@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { Plus, X } from "lucide-react";
+import { PortCheck } from "@/components/PortCheck";
 import { createServer, type ServerFormState } from "@/lib/servers/actions";
 
 const initialState: ServerFormState = {};
@@ -29,6 +30,7 @@ export function ServerCreateForm({
   portsLabel: string;
 }) {
   const [state, action, pending] = useActionState(createServer, initialState);
+  const [hostPort, setHostPort] = useState("");
   const [envRows, setEnvRows] = useState<EnvRow[]>([
     { key: "EULA", value: "TRUE" },
   ]);
@@ -165,8 +167,11 @@ export function ServerCreateForm({
               max={portMax}
               placeholder="auto"
               data-keep-empty
+              value={hostPort}
+              onChange={(e) => setHostPort(e.target.value)}
               className={inputClass}
             />
+            <PortCheck port={hostPort} />
           </div>
         )}
       </fieldset>

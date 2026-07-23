@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Cpu, HardDrive, MemoryStick, Save, User, Globe, Server } from "lucide-react";
+import { PortCheck } from "@/components/PortCheck";
 import { updateServerGeneralSettings, type ServerFormState } from "@/lib/servers/actions";
 import type { Server as ServerType } from "@/lib/db/schema";
 
@@ -39,6 +40,7 @@ export function ServerGeneralForm({
     updateServerGeneralSettings,
     {},
   );
+  const [hostPort, setHostPort] = useState(String(server.hostPort));
 
   return (
     <form action={formAction} className="space-y-6 rounded-xl border border-border bg-card p-6">
@@ -173,11 +175,15 @@ export function ServerGeneralForm({
             min={portMin}
             max={portMax}
             required
-            defaultValue={server.hostPort}
+            value={hostPort}
+            onChange={(e) => setHostPort(e.target.value)}
             readOnly={!canChoosePort}
             disabled={!canEdit}
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground read-only:opacity-60 focus:border-accent focus:outline-none disabled:opacity-50"
           />
+          {canChoosePort && canEdit && hostPort !== String(server.hostPort) && (
+            <PortCheck port={hostPort} serverId={server.id} />
+          )}
           <p className="text-[11px] text-muted-foreground">
             {canChoosePort
               ? `Port public de connexion. Autorisés : ${portsLabel}. Doit être libre.`
