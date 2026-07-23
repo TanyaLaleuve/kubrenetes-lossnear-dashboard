@@ -17,8 +17,10 @@ function CopyField({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
+      {/* Le bloc de texte s'ajuste à son contenu : le bouton copier reste
+          collé à sa droite au lieu de partir au bout de la carte. */}
       <div className="mt-1 flex items-center gap-1.5">
-        <code className="min-w-0 flex-1 truncate rounded bg-background px-2 py-1.5 font-mono text-xs">
+        <code className="min-w-0 truncate rounded bg-background px-2 py-1.5 font-mono text-xs">
           {value}
         </code>
         <button
