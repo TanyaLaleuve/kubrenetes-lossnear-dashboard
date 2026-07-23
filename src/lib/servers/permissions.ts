@@ -49,7 +49,7 @@ export const PERMISSION_GROUPS = [
         key: "settings.general",
         label: "Général (nom, ressources, ports, adresse)",
       },
-      { key: "settings.egg", label: "Egg / Conteneur" },
+      { key: "settings.egg", label: "Startup (image, démarrage, variables)" },
       { key: "settings.manage", label: "Gestion (réinstaller, migrer)" },
     ],
   },

@@ -7,7 +7,7 @@ import { serverAccess } from "@/lib/servers/authz";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Configuration Egg" };
+export const metadata = { title: "Startup" };
 
 export default async function ServerSettingsEggPage({
   params,

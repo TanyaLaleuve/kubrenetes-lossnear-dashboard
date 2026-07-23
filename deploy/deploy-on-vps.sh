@@ -44,6 +44,13 @@ main() {
     kubectl apply -f "$manifest"
   done
 
+  echo "=== Synchroniseur de pare-feu (ports serveurs -> ufw) ==="
+  install -m 755 "$DIR/deploy/lossnear-ufw-sync.sh" /usr/local/bin/lossnear-ufw-sync.sh
+  install -m 644 "$DIR/deploy/lossnear-ufw-sync.service" /etc/systemd/system/
+  install -m 644 "$DIR/deploy/lossnear-ufw-sync.timer" /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now lossnear-ufw-sync.timer
+
   echo "=== Rollout ==="
   kubectl -n lossnear-system rollout restart deployment/k8s-dashboard
   kubectl -n lossnear-system rollout restart daemonset/lossnear-agent

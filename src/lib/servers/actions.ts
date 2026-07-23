@@ -616,7 +616,7 @@ export async function updateServerEggSettings(
 
   await updateServerWorkload(updated);
   revalidatePath(`/servers/${serverId}`);
-  revalidatePath(`/servers/${serverId}/settings/egg`);
+  revalidatePath(`/servers/${serverId}/settings/startup`);
   return {};
 }
 

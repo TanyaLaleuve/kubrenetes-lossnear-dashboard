@@ -68,10 +68,10 @@ export default async function ServerDetailPage({
   // SettingsNav), pour ne pas atterrir sur Général sans la permission.
   const settingsHref = privileged || can("settings.general")
     ? `/servers/${server.id}/settings`
-    : can("members.read") || can("members.manage")
-      ? `/servers/${server.id}/settings/permissions`
-      : can("settings.egg")
-        ? `/servers/${server.id}/settings/egg`
+    : can("settings.egg")
+      ? `/servers/${server.id}/settings/startup`
+      : can("members.read") || can("members.manage")
+        ? `/servers/${server.id}/settings/permissions`
         : `/servers/${server.id}/settings/management`;
 
   const status = await serverRuntimeStatus(server).catch(() => ({

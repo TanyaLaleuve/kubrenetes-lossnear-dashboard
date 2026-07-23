@@ -1,0 +1,7 @@
+[Unit]
+Description=Synchronise les regles ufw avec les ports des serveurs lossnear
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/lossnear-ufw-sync.sh

@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Egg, HardDrive, Shield, Sliders } from "lucide-react";
+import { HardDrive, Shield, Sliders, Terminal } from "lucide-react";
 
 export function SettingsNav({
   serverId,
   tabs: allowed,
 }: {
   serverId: string;
-  tabs: { general: boolean; permissions: boolean; egg: boolean; management: boolean };
+  tabs: {
+    general: boolean;
+    startup: boolean;
+    permissions: boolean;
+    management: boolean;
+  };
 }) {
   const pathname = usePathname();
 
@@ -22,18 +27,18 @@ export function SettingsNav({
       show: allowed.general,
     },
     {
+      href: `/servers/${serverId}/settings/startup`,
+      exact: false,
+      label: "Startup",
+      icon: Terminal,
+      show: allowed.startup,
+    },
+    {
       href: `/servers/${serverId}/settings/permissions`,
       exact: false,
       label: "Permissions",
       icon: Shield,
       show: allowed.permissions,
-    },
-    {
-      href: `/servers/${serverId}/settings/egg`,
-      exact: false,
-      label: "Egg / Conteneur",
-      icon: Egg,
-      show: allowed.egg,
     },
     {
       href: `/servers/${serverId}/settings/management`,
