@@ -7,6 +7,7 @@ import {
   GripVertical,
   Pencil,
   Plus,
+  RotateCcw,
   Trash2,
   Variable,
   X,
@@ -34,6 +35,7 @@ export function MessageBuilder({
   value,
   onChange,
   name,
+  defaultValue,
   variables = DEFAULT_VARIABLES,
   botName,
   botAvatar,
@@ -42,11 +44,22 @@ export function MessageBuilder({
   onChange: (next: MessagePayload) => void;
   /** Si fourni : un input caché contient le JSON du payload (soumission form). */
   name?: string;
+  /** Message par défaut (référence en lecture seule). Défaut : valeur initiale. */
+  defaultValue?: MessagePayload;
   variables?: MessageVariable[];
   botName?: string;
   botAvatar?: string;
 }) {
   const [tab, setTab] = useState<Tab>("editor");
+  const [view, setView] = useState<"current" | "default">("current");
+  // Défaut figé : la prop si fournie, sinon la valeur au premier rendu (state
+  // à initialisation paresseuse — capturé une seule fois au montage).
+  const [frozenDefault] = useState(() => defaultValue ?? value);
+  const defaultPayload = defaultValue ?? frozenDefault;
+  const restoreDefault = () => {
+    onChange(JSON.parse(JSON.stringify(defaultPayload)) as MessagePayload);
+    setView("current");
+  };
   const active = useRef<{
     el: HTMLInputElement | HTMLTextAreaElement;
     set: SetValue;
@@ -125,7 +138,56 @@ export function MessageBuilder({
         ))}
       </nav>
 
-      {tab === "editor" && (
+      {/* Bascule Défaut / Actuel (sauf sur l'onglet Variables). */}
+      {tab !== "variables" && (
+        <div className="flex border-b border-border">
+          {(
+            [
+              ["default", "Défaut"],
+              ["current", "Actuel"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setView(key)}
+              className={`flex-1 cursor-pointer border-b-2 px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
+                view === key
+                  ? "border-accent/60 bg-accent/5 text-accent"
+                  : "border-transparent text-muted-foreground hover:bg-card-hover hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "editor" && view === "default" && (
+        <div className="space-y-2 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              Message par défaut (lecture seule).
+            </p>
+            <button
+              type="button"
+              onClick={restoreDefault}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <RotateCcw className="size-3.5" aria-hidden />
+              Restaurer ce défaut
+            </button>
+          </div>
+          <DiscordMessagePreview
+            payload={defaultPayload}
+            variables={variables}
+            botName={botName}
+            botAvatar={botAvatar}
+          />
+        </div>
+      )}
+
+      {tab === "editor" && view === "current" && (
         <div className="grid lg:grid-cols-[1fr_minmax(300px,400px)]">
           <div className="space-y-2.5 p-3">
             {/* Contenu */}
@@ -216,9 +278,24 @@ export function MessageBuilder({
       )}
 
       {tab === "preview" && (
-        <div className="p-3">
+        <div className="space-y-2 p-3">
+          {view === "default" && (
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                Aperçu du message par défaut.
+              </p>
+              <button
+                type="button"
+                onClick={restoreDefault}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+              >
+                <RotateCcw className="size-3.5" aria-hidden />
+                Restaurer ce défaut
+              </button>
+            </div>
+          )}
           <DiscordMessagePreview
-            payload={value}
+            payload={view === "default" ? defaultPayload : value}
             variables={variables}
             botName={botName}
             botAvatar={botAvatar}
