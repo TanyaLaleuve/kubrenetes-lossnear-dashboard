@@ -49,7 +49,7 @@ export default async function ServerFilesPage({
         <SftpInfo
           host={PUBLIC_IP}
           port={2222}
-          username={`${user.username}.${server.id}`}
+          username={`${user.username}.${server.shortId}`}
         />
       )}
 

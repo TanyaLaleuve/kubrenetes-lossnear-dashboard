@@ -5,6 +5,7 @@ import {
   Play,
   RotateCw,
   Settings,
+  Terminal,
   Skull,
   Square,
   Users,
@@ -67,12 +68,10 @@ export default async function ServerDetailPage({
   // Onglet Paramètres cible : le premier accessible (même ordre que
   // SettingsNav), pour ne pas atterrir sur Général sans la permission.
   const settingsHref = privileged || can("settings.general")
-    ? `/servers/${server.id}/settings`
+    ? `/servers/${server.shortId}/settings`
     : can("settings.egg")
-      ? `/servers/${server.id}/settings/startup`
-      : can("members.read") || can("members.manage")
-        ? `/servers/${server.id}/settings/permissions`
-        : `/servers/${server.id}/settings/management`;
+      ? `/servers/${server.shortId}/settings/startup`
+      : `/servers/${server.shortId}/settings/management`;
 
   const status = await serverRuntimeStatus(server).catch(() => ({
     label: "Error" as const,
@@ -169,20 +168,11 @@ export default async function ServerDetailPage({
         >
           {can("files.read") && (
             <Link
-              href={`/servers/${server.id}/files`}
+              href={`/servers/${server.shortId}/files`}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
             >
               <FolderOpen className="size-4" aria-hidden />
               Fichiers
-            </Link>
-          )}
-          {can("members.read") && (
-            <Link
-              href={`/servers/${server.id}/members`}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
-            >
-              <Users className="size-4" aria-hidden />
-              Permissions
             </Link>
           )}
           {canModifySettings && (
@@ -192,6 +182,24 @@ export default async function ServerDetailPage({
             >
               <Settings className="size-4" aria-hidden />
               Paramètres
+            </Link>
+          )}
+          {(privileged || can("settings.egg")) && (
+            <Link
+              href={`/servers/${server.shortId}/settings/startup`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <Terminal className="size-4" aria-hidden />
+              Startup
+            </Link>
+          )}
+          {can("members.read") && (
+            <Link
+              href={`/servers/${server.shortId}/members`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+            >
+              <Users className="size-4" aria-hidden />
+              Permissions
             </Link>
           )}
         </section>

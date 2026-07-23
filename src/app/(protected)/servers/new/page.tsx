@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { ArrowLeft, Boxes, Egg as EggIcon, Rocket } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ServerCreateForm } from "@/components/ServerCreateForm";
@@ -89,6 +89,15 @@ export default async function NewServerPage({
 
   // --- Création image libre ---
   if (mode === "custom") {
+    // Suggestions d'images : catalogue partagé (les eggs l'alimentent aussi).
+    const catalogImages = await db()
+      .select({
+        reference: schema.dockerImages.reference,
+        label: schema.dockerImages.label,
+      })
+      .from(schema.dockerImages)
+      .orderBy(asc(schema.dockerImages.reference));
+
     return (
       <div className="space-y-6">
         <Header
@@ -96,7 +105,11 @@ export default async function NewServerPage({
           back="/servers/new"
         />
         <div className="rounded-xl border border-border bg-card p-5">
-          <ServerCreateForm {...cap} {...portProps} />
+          <ServerCreateForm
+            {...cap}
+            {...portProps}
+            catalogImages={catalogImages}
+          />
         </div>
       </div>
     );

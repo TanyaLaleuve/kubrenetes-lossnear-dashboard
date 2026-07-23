@@ -20,6 +20,7 @@ export function ServerCreateForm({
   portMin,
   portMax,
   portsLabel,
+  catalogImages,
 }: {
   maxMemoryMi: number;
   maxCpuMilli: number;
@@ -28,6 +29,8 @@ export function ServerCreateForm({
   portMin: number;
   portMax: number;
   portsLabel: string;
+  /** Images du catalogue proposées en suggestions (saisie libre conservée). */
+  catalogImages: { reference: string; label: string | null }[];
 }) {
   const [state, action, pending] = useActionState(createServer, initialState);
   const [hostPort, setHostPort] = useState("");
@@ -67,9 +70,18 @@ export function ServerCreateForm({
         <input
           id="image"
           name="image"
+          list="catalog-images"
           placeholder="itzg/minecraft-server:latest"
           className={`${inputClass} font-mono`}
         />
+        {/* Suggestions issues du catalogue d'images, saisie libre conservée. */}
+        <datalist id="catalog-images">
+          {catalogImages.map((img) => (
+            <option key={img.reference} value={img.reference}>
+              {img.label ?? ""}
+            </option>
+          ))}
+        </datalist>
         <p className="text-xs text-muted-foreground">
           Vide = valeur du placeholder. Minecraft récent :{" "}
           <code className="font-mono">itzg/minecraft-server:latest</code>. Vieilles

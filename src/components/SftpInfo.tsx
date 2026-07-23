@@ -53,7 +53,8 @@ export function SftpInfo({
   port: number;
   username: string;
 }) {
-  const url = `sftp://${username}@${host}:${port}`;
+  // Sans l'identifiant : il est affiché juste en dessous, le lien reste court.
+  const url = `sftp://${host}:${port}`;
 
   return (
     <section

@@ -99,6 +99,13 @@
       "when": 1784761949200,
       "tag": "0013_docker_images_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784808664361,
+      "tag": "0014_server_short_id",
+      "breakpoints": true
     }
   ]
 }

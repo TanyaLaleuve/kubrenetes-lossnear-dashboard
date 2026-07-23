@@ -95,6 +95,11 @@ export const servers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 48 }).notNull(),
+    /**
+     * Identifiant court public (URLs, identifiant SFTP). Plus lisible qu'un
+     * UUID ; l'UUID reste la clé primaire interne.
+     */
+    shortId: varchar("short_id", { length: 12 }).notNull().unique(),
     /** Identifiant DNS-safe utilisé pour les objets Kubernetes. */
     slug: varchar("slug", { length: 40 }).notNull().unique(),
     image: text("image").notNull(),

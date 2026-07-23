@@ -135,7 +135,7 @@ export default async function ServersPage({
         <ServerGrid
           userId={user.id}
           items={withStatus.map(({ server, status }) => ({
-            id: server.id,
+            id: server.shortId,
             name: server.name,
             image: server.image,
             hostPort: server.hostPort,

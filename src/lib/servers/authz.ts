@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import type { Server } from "@/lib/db/schema";
 import type { SafeUser } from "@/lib/auth/user";
@@ -12,18 +12,28 @@ export type ServerAccess = {
   privileged: boolean;
 };
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /**
  * Accès d'un utilisateur à un serveur : renvoie ses permissions effectives,
  * ou null s'il n'a aucun accès (ni propriétaire, ni admin, ni membre).
+ *
+ * `ref` accepte l'identifiant court public (URLs, SFTP) ou l'UUID interne.
  */
 export async function serverAccess(
   user: SafeUser,
-  serverId: string,
+  ref: string,
 ): Promise<ServerAccess | null> {
+  if (!ref) return null;
   const rows = await db()
     .select()
     .from(schema.servers)
-    .where(eq(schema.servers.id, serverId))
+    .where(
+      UUID_RE.test(ref)
+        ? or(eq(schema.servers.id, ref), eq(schema.servers.shortId, ref))
+        : eq(schema.servers.shortId, ref),
+    )
     .limit(1);
   const server = rows[0];
   if (!server) return null;
@@ -37,7 +47,7 @@ export async function serverAccess(
     .from(schema.serverMembers)
     .where(
       and(
-        eq(schema.serverMembers.serverId, serverId),
+        eq(schema.serverMembers.serverId, server.id),
         eq(schema.serverMembers.userId, user.id),
       ),
     )

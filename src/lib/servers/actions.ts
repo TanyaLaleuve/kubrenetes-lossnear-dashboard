@@ -92,6 +92,16 @@ function optionalHostPort() {
   );
 }
 
+/**
+ * Identifiant court public (10 caractères). Alphabet sans caractères
+ * ambigus (0/o, 1/l/i) pour rester lisible et dictable.
+ */
+function newShortId(): string {
+  const alphabet = "23456789abcdefghjkmnpqrstuvwxyz";
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+}
+
 function slugify(name: string): string {
   const base = name
     .toLowerCase()
@@ -270,6 +280,7 @@ export async function createServer(
     .values({
       ownerId: user.id,
       name: input.name,
+      shortId: newShortId(),
       slug: slugify(input.name),
       image: input.image,
       command: input.command || null,
@@ -285,7 +296,7 @@ export async function createServer(
 
   await applyServer(server);
   revalidatePath("/servers");
-  redirect(`/servers/${server.id}`);
+  redirect(`/servers/${server.shortId}`);
 }
 
 const fromEggSchema = z.object({
@@ -346,6 +357,7 @@ export async function createServerFromEgg(
     .values({
       ownerId: user.id,
       name: input.name,
+      shortId: newShortId(),
       slug: slugify(input.name),
       image: input.image,
       env,
@@ -367,7 +379,7 @@ export async function createServerFromEgg(
 
   await applyServer(server);
   revalidatePath("/servers");
-  redirect(`/servers/${server.id}`);
+  redirect(`/servers/${server.shortId}`);
 }
 
 async function setDesiredState(
@@ -765,7 +777,6 @@ export async function createSubUser(
  * paramètres et la page /members historique.
  */
 function revalidateMemberPages(serverId: string) {
-  revalidatePath(`/servers/${serverId}/settings/permissions`);
   revalidatePath(`/servers/${serverId}/members`);
 }
 

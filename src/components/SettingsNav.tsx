@@ -2,19 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { HardDrive, Shield, Sliders, Terminal } from "lucide-react";
+import { HardDrive, Sliders, Terminal } from "lucide-react";
 
 export function SettingsNav({
   serverId,
   tabs: allowed,
 }: {
   serverId: string;
-  tabs: {
-    general: boolean;
-    startup: boolean;
-    permissions: boolean;
-    management: boolean;
-  };
+  tabs: { general: boolean; startup: boolean; management: boolean };
 }) {
   const pathname = usePathname();
 
@@ -32,13 +27,6 @@ export function SettingsNav({
       label: "Startup",
       icon: Terminal,
       show: allowed.startup,
-    },
-    {
-      href: `/servers/${serverId}/settings/permissions`,
-      exact: false,
-      label: "Permissions",
-      icon: Shield,
-      show: allowed.permissions,
     },
     {
       href: `/servers/${serverId}/settings/management`,

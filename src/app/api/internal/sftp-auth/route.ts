@@ -14,8 +14,12 @@ import { resolveVolumeDir } from "@/lib/servers/files";
 const bodySchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
-  serverId: z.string().uuid(),
+  /** Identifiant court public du serveur (ou UUID hérité). */
+  serverId: z.string().min(1).max(64),
 });
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(request: Request) {
   const token = env().AGENT_TOKEN;
@@ -48,7 +52,14 @@ export async function POST(request: Request) {
   const servers = await db()
     .select()
     .from(schema.servers)
-    .where(eq(schema.servers.id, serverId))
+    .where(
+      UUID_RE.test(serverId)
+        ? or(
+            eq(schema.servers.id, serverId),
+            eq(schema.servers.shortId, serverId),
+          )
+        : eq(schema.servers.shortId, serverId),
+    )
     .limit(1);
   const server = servers[0];
   if (!server) {
@@ -63,7 +74,7 @@ export async function POST(request: Request) {
       .from(schema.serverMembers)
       .where(
         and(
-          eq(schema.serverMembers.serverId, serverId),
+          eq(schema.serverMembers.serverId, server.id),
           eq(schema.serverMembers.userId, user.id),
         ),
       )

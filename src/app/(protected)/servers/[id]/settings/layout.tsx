@@ -26,11 +26,6 @@ export default async function ServerSettingsLayout({
   const tabs = {
     general: !!access && (access.privileged || access.permissions.has("settings.general")),
     startup: !!access && (access.privileged || access.permissions.has("settings.egg")),
-    permissions:
-      !!access &&
-      (access.privileged ||
-        access.permissions.has("members.read") ||
-        access.permissions.has("members.manage")),
     management: !!access && (access.privileged || access.permissions.has("settings.manage")),
   };
   if (!access || !Object.values(tabs).some(Boolean)) {
