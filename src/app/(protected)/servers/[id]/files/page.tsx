@@ -6,7 +6,7 @@ import { SftpInfo } from "@/components/SftpInfo";
 import { currentUser } from "@/lib/auth/user";
 import { serverAccess } from "@/lib/servers/authz";
 import { serverNavProps } from "@/lib/servers/nav";
-import { PUBLIC_IP } from "@/lib/servers/constants";
+import { serverHost } from "@/lib/servers/address";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function ServerFilesPage({
 
       {permissions.has("files.sftp") && (
         <SftpInfo
-          host={PUBLIC_IP}
+          host={serverHost(server)}
           port={2222}
           username={`${user.username}.${server.shortId}`}
         />

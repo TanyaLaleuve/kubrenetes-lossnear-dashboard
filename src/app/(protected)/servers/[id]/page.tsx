@@ -16,7 +16,7 @@ import {
 } from "@/lib/servers/actions";
 import { serverAccess } from "@/lib/servers/authz";
 import { serverNavProps } from "@/lib/servers/nav";
-import { PUBLIC_IP } from "@/lib/servers/constants";
+import { serverAddress } from "@/lib/servers/address";
 import { SERVERS_NAMESPACE, serverRuntimeStatus } from "@/lib/servers/k8s";
 import { podMetrics } from "@/lib/k8s/resources";
 import {
@@ -41,7 +41,7 @@ export default async function ServerDetailPage({
 
   const access = await serverAccess(user, id);
   if (!access) redirect("/servers");
-  const { server, permissions, privileged } = access;
+  const { server, permissions } = access;
   const can = (perm: string) => permissions.has(perm);
   const canAnyControl =
     can("control.start") ||
@@ -137,19 +137,7 @@ export default async function ServerDetailPage({
         aria-label="Informations"
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
       >
-        {privileged ? (
-          <ServerAddress
-            serverId={server.id}
-            address={server.displayAddress}
-            fallback={`${PUBLIC_IP}:${server.hostPort}`}
-          />
-        ) : (
-          <Info label="Adresse">
-            <span className="font-mono">
-              {server.displayAddress || `${PUBLIC_IP}:${server.hostPort}`}
-            </span>
-          </Info>
-        )}
+        <ServerAddress address={serverAddress(server)} />
         <Info label="RAM">
           {podMetric
             ? `${formatBytes(parseMemory(podMetric.containers[0]?.usage.memory ?? "0"))} / ${server.memoryMi} Mio`

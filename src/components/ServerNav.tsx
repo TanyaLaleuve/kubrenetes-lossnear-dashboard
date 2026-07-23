@@ -75,7 +75,6 @@ export function ServerNav({
           label="Paramètres"
           icon={Settings}
           active={settingsActive}
-          className="ml-auto"
         />
       )}
     </nav>
@@ -87,13 +86,11 @@ function NavLink({
   label,
   icon: Icon,
   active,
-  className = "",
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
-  className?: string;
 }) {
   return (
     <Link
@@ -103,7 +100,7 @@ function NavLink({
         active
           ? "border-accent/20 bg-accent/15 font-semibold text-accent"
           : "border-border text-muted-foreground hover:bg-card-hover hover:text-foreground"
-      } ${className}`}
+      }`}
     >
       <Icon className="size-4" aria-hidden />
       {label}

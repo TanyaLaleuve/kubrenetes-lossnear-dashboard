@@ -12,7 +12,9 @@ import {
   User,
 } from "lucide-react";
 import { PortCheck } from "@/components/PortCheck";
+import { ToggleSwitch } from "@/components/ToggleSwitch";
 import { updateServerGeneralSettings, type ServerFormState } from "@/lib/servers/actions";
+import { PUBLIC_IP } from "@/lib/servers/constants";
 import type { Server as ServerType } from "@/lib/db/schema";
 
 type UserItem = {
@@ -53,6 +55,14 @@ export function ServerGeneralForm({
     {},
   );
   const [hostPort, setHostPort] = useState(String(server.hostPort));
+  const [domain, setDomain] = useState(server.displayAddress ?? "");
+  const [showPort, setShowPort] = useState(server.showPort);
+
+  // Aperçu vivant de ce que verront les joueurs.
+  const publicIp = PUBLIC_IP;
+  const previewAddress = `${domain.trim() || publicIp}${
+    showPort ? `:${hostPort || server.hostPort}` : ""
+  }`;
 
   return (
     <form action={formAction} className="space-y-6 rounded-xl border border-border bg-card p-6">
@@ -255,20 +265,37 @@ export function ServerGeneralForm({
           </div>
         )}
 
-        {/* Adresse d'affichage */}
-        <div className="space-y-2 sm:col-span-2">
-          <label htmlFor="displayAddress" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Globe className="size-3.5" /> Adresse personnalisée d&apos;affichage (optionnel)
-          </label>
-          <input
-            id="displayAddress"
-            name="displayAddress"
-            type="text"
-            placeholder="play.example.com"
-            data-keep-empty
-            defaultValue={server.displayAddress ?? ""}
+        {/* Nom de domaine + affichage du port */}
+        <div className="space-y-3 sm:col-span-2">
+          <div className="space-y-2">
+            <label htmlFor="displayAddress" className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <Globe className="size-3.5" /> Nom de domaine (optionnel)
+            </label>
+            <input
+              id="displayAddress"
+              name="displayAddress"
+              type="text"
+              placeholder={publicIp}
+              data-keep-empty
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              disabled={!canEdit}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Remplace l&apos;IP partout : adresse de connexion et lien SFTP.
+              Ton domaine doit pointer sur {publicIp} (enregistrement DNS de
+              type A). Vide = l&apos;IP est affichée.
+            </p>
+          </div>
+
+          <ToggleSwitch
+            name="showPort"
+            checked={showPort}
+            onChange={setShowPort}
             disabled={!canEdit}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+            label="Afficher le port dans l'adresse"
+            description={`Aperçu : ${previewAddress}`}
           />
         </div>
       </div>

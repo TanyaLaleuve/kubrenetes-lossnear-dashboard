@@ -113,6 +113,13 @@
       "when": 1784810808427,
       "tag": "0015_egg_category",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1784826576822,
+      "tag": "0016_server_show_port",
+      "breakpoints": true
     }
   ]
 }

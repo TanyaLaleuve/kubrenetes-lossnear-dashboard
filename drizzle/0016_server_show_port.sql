@@ -1,0 +1,1 @@
+ALTER TABLE "servers" ADD COLUMN "show_port" boolean DEFAULT true NOT NULL;

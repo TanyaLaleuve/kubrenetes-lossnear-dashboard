@@ -447,31 +447,18 @@ export async function deleteServer(id: string) {
   redirect("/servers");
 }
 
-const addressSchema = z
+/**
+ * Nom de domaine seul (pas de port, pas de schéma) : il remplace l'IP du nœud
+ * partout, y compris dans le lien SFTP, donc il doit rester résolvable tel quel.
+ */
+const domainSchema = z
   .string()
   .trim()
-  .max(255)
-  .regex(/^[a-z0-9.:-]*$/i, "Adresse invalide (ex. play.lossnear.com)");
-
-/** Adresse affichée aux joueurs (domaine) — owner ou admin. Vide = IP:port. */
-export async function updateServerAddress(
-  _prev: ServerFormState,
-  formData: FormData,
-): Promise<ServerFormState> {
-  const user = await currentUser();
-  const id = String(formData.get("serverId") ?? "");
-  const server = await requirePrivileged(user, id);
-
-  const parsed = addressSchema.safeParse(formData.get("displayAddress") ?? "");
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
-
-  await db()
-    .update(schema.servers)
-    .set({ displayAddress: parsed.data || null, updatedAt: new Date() })
-    .where(eq(schema.servers.id, server.id));
-  revalidatePath(`/servers/${id}`);
-  return { success: "Adresse mise à jour." };
-}
+  .max(253)
+  .regex(
+    /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i,
+    "Nom de domaine invalide (ex. play.lossnear.com, sans http:// ni port)",
+  );
 
 const generalSettingsSchema = z.object({
   serverId: z.string().uuid(),
@@ -485,7 +472,8 @@ const generalSettingsSchema = z.object({
     .max(PORT_MAX, `Port externe : ${PORT_MIN}-${PORT_MAX}`),
   cpuMilli: z.coerce.number().int().min(250).max(16000),
   memoryMi: z.coerce.number().int().min(256).max(32768),
-  displayAddress: z.string().trim().max(255).optional(),
+  displayAddress: domainSchema.optional(),
+  showPort: z.boolean(),
 });
 
 /** Mise à jour des paramètres généraux (Nom, ressources, ports, propriétaire, adresse). */
@@ -510,6 +498,8 @@ export async function updateServerGeneralSettings(
     cpuMilli: formData.get("cpuMilli"),
     memoryMi: formData.get("memoryMi"),
     displayAddress: formData.get("displayAddress") || undefined,
+    // Case décochée = champ absent du FormData.
+    showPort: formData.get("showPort") !== null,
   });
 
   if (!parsed.success) {
@@ -547,6 +537,7 @@ export async function updateServerGeneralSettings(
     cpuMilli: input.cpuMilli,
     memoryMi: input.memoryMi,
     displayAddress: input.displayAddress || null,
+    showPort: input.showPort,
     // Ligne de démarrage : uniquement avec la permission dédiée (le champ
     // n'est pas rendu sinon, mais on revalide côté serveur).
     ...(access.privileged || access.permissions.has("settings.startup_command")

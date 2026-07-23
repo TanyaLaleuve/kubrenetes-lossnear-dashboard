@@ -9,7 +9,8 @@ export type ServerCardItem = {
   id: string;
   name: string;
   image: string;
-  hostPort: number;
+  /** Adresse de connexion affichée (domaine ou IP, port selon le réglage). */
+  address: string;
   memoryMi: number;
   cpuMilli: number;
   diskGi: number;
@@ -157,14 +158,14 @@ export function ServerGrid({
                   {item.image}
                 </p>
               </div>
-              <div className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:block">
-                <p>port {item.hostPort}</p>
+              <div className="hidden max-w-56 shrink-0 font-mono text-xs text-muted-foreground sm:block">
+                <p className="truncate">{item.address}</p>
                 <p className="mt-0.5">
                   {item.memoryMi} Mio · {item.cpuMilli}m
                 </p>
               </div>
-              <div className="shrink-0 text-right font-mono text-[10px] text-muted-foreground sm:hidden">
-                <p>:{item.hostPort}</p>
+              <div className="min-w-0 shrink-0 text-right font-mono text-[10px] text-muted-foreground sm:hidden">
+                <p className="truncate">{item.address}</p>
                 <p>{item.ageLabel}</p>
               </div>
               <p className="hidden shrink-0 font-mono text-xs text-muted-foreground sm:block">

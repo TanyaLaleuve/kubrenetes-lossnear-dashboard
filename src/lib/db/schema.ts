@@ -108,8 +108,16 @@ export const servers = pgTable(
     env: jsonb("env").$type<Record<string, string>>().notNull().default({}),
     hostPort: integer("host_port").notNull().unique(),
     containerPort: integer("container_port").notNull().default(25565),
-    /** Adresse affichée aux joueurs (ex. play.lossnear.com) à la place de IP:port. */
+    /**
+     * Nom de domaine du propriétaire (ex. play.lossnear.com), affiché partout
+     * à la place de l'IP du nœud : adresse de connexion, SFTP. null = IP.
+     */
     displayAddress: varchar("display_address", { length: 255 }),
+    /**
+     * Afficher `:port` après l'adresse de connexion. À décocher quand un
+     * enregistrement SRV (ou un port par défaut) rend le port inutile.
+     */
+    showPort: boolean("show_port").notNull().default(true),
     cpuMilli: integer("cpu_milli").notNull(),
     memoryMi: integer("memory_mi").notNull(),
     diskGi: integer("disk_gi").notNull(),

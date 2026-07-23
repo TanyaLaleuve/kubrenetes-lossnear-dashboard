@@ -7,6 +7,7 @@ import { ViewAllToggle } from "@/components/ViewAllToggle";
 import { requireView } from "@/lib/auth/user";
 import { canViewAllServers } from "@/lib/auth/dashboard-permissions";
 import { db, schema } from "@/lib/db";
+import { serverAddress } from "@/lib/servers/address";
 import { serverRuntimeStatus } from "@/lib/servers/k8s";
 import { formatAge } from "@/lib/k8s/format";
 
@@ -138,7 +139,7 @@ export default async function ServersPage({
             id: server.shortId,
             name: server.name,
             image: server.image,
-            hostPort: server.hostPort,
+            address: serverAddress(server),
             memoryMi: server.memoryMi,
             cpuMilli: server.cpuMilli,
             diskGi: server.diskGi,
