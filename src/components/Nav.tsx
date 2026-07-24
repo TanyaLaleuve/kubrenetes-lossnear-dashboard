@@ -17,7 +17,6 @@ import {
   SquareStack,
   Users,
 } from "lucide-react";
-import { Avatar } from "@/components/Avatar";
 
 type NavUser = {
   id: string;
@@ -35,10 +34,6 @@ const mainLinks = [
   { href: "/workloads", label: "Workloads", icon: SquareStack, perm: "view.workloads" },
   { href: "/system", label: "Système", icon: Cog, perm: "view.system" },
 ];
-
-/* Nav mobile limitée à 5 entrées : Workloads reste accessible via la sidebar
-   desktop et les liens de la vue d'ensemble. */
-const mobileLinks = mainLinks.filter((l) => l.href !== "/workloads");
 
 const clusterLinks = [
   { href: "/nodes", label: "Nœuds", icon: Server, perm: "view.nodes" },
@@ -81,7 +76,6 @@ export function Nav({ user }: { user: NavUser }) {
   const canSee = (perm: string) =>
     user.isAdmin || user.permissions.includes(perm);
   const visibleMain = mainLinks.filter((l) => canSee(l.perm));
-  const visibleMobile = mobileLinks.filter((l) => canSee(l.perm));
   const visibleCluster = clusterLinks.filter((l) => canSee(l.perm));
 
   return (
@@ -154,39 +148,7 @@ export function Nav({ user }: { user: NavUser }) {
         </nav>
       </aside>
 
-      {/* Bottom nav mobile : 5 entrées max */}
-      <nav
-        aria-label="Navigation principale"
-        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
-      >
-        {visibleMobile.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] transition-colors duration-150 ${
-              isActive(pathname, href) ? "text-accent" : "text-muted-foreground"
-            }`}
-          >
-            <Icon className="size-5" aria-hidden />
-            {label}
-          </Link>
-        ))}
-        <Link
-          href="/profile"
-          className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] transition-colors duration-150 ${
-            isActive(pathname, "/profile") ? "text-accent" : "text-muted-foreground"
-          }`}
-        >
-          <Avatar
-            userId={user.id}
-            username={user.username}
-            hasAvatar={user.hasAvatar}
-            version={user.avatarVersion}
-            size={20}
-          />
-          Profil
-        </Link>
-      </nav>
+      {/* Sur mobile : plus de barre du bas, tout passe par le burger (TopBar). */}
     </>
   );
 }

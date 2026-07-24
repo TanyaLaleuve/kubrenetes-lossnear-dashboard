@@ -17,6 +17,8 @@ export default async function ProtectedLayout({
           username: user.username,
           hasAvatar: user.hasAvatar,
           avatarVersion: user.updatedAt,
+          isAdmin: user.isAdmin,
+          permissions: user.permissions,
         }}
       />
       <Nav
@@ -29,8 +31,9 @@ export default async function ProtectedLayout({
           permissions: user.permissions,
         }}
       />
-      {/* Pleine largeur : le contenu occupe toute la place disponible. */}
-      <main className="px-4 pb-24 pt-6 md:ml-56 md:px-8 md:pb-10">
+      {/* Pleine largeur : le contenu occupe toute la place disponible.
+          Plus de barre du bas sur mobile -> padding bas normal. */}
+      <main className="px-4 pb-10 pt-6 md:ml-56 md:px-8">
         <div className="mx-auto w-full">{children}</div>
       </main>
     </div>

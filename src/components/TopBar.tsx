@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bot, LogOut, Server } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
+import { MobileMenu } from "@/components/MobileMenu";
 import { logout } from "@/lib/auth/actions";
 
 type TopBarUser = {
@@ -11,6 +12,8 @@ type TopBarUser = {
   username: string;
   hasAvatar: boolean;
   avatarVersion: number;
+  isAdmin: boolean;
+  permissions: string[];
 };
 
 /**
@@ -27,6 +30,13 @@ export function TopBar({ user }: { user: TopBarUser }) {
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 flex h-14 items-center gap-3 border-b border-border bg-card px-3 sm:px-4">
+      <MobileMenu
+        user={{
+          username: user.username,
+          isAdmin: user.isAdmin,
+          permissions: user.permissions,
+        }}
+      />
       <Link href="/" className="flex shrink-0 items-center gap-2">
         <span className="size-2 rounded-full bg-accent" aria-hidden />
         <span className="text-base font-semibold tracking-tight sm:text-lg">
@@ -34,9 +44,10 @@ export function TopBar({ user }: { user: TopBarUser }) {
         </span>
       </Link>
 
+      {/* Sous-dashboards : sur desktop uniquement (repris dans le burger mobile). */}
       <nav
         aria-label="Sous-dashboards"
-        className="flex min-w-0 flex-1 justify-center gap-1 overflow-x-auto"
+        className="hidden min-w-0 flex-1 justify-center gap-1 overflow-x-auto md:flex"
       >
         {DASHBOARDS.map(({ href, label, icon: Icon, match }) => {
           const active = match(pathname);
