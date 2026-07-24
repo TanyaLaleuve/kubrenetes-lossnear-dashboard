@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { SendHorizontal } from "lucide-react";
+import { Eraser, SendHorizontal } from "lucide-react";
 
 // Séquences ANSI (couleurs, curseur) et caractères de contrôle à masquer.
 const ANSI_PATTERN = new RegExp(
@@ -86,7 +86,19 @@ export function ServerConsole({
 
   return (
     <section aria-label="Console" className="space-y-2">
-      <h2 className="text-sm font-semibold text-muted-foreground">Console</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-muted-foreground">Console</h2>
+        {running && lines.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setLines([])}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors duration-150 hover:bg-card-hover hover:text-foreground"
+          >
+            <Eraser className="size-3.5" aria-hidden />
+            Effacer
+          </button>
+        )}
+      </div>
       <div className="overflow-hidden rounded-xl border border-border bg-[#04070f]">
         <div
           ref={scrollRef}
@@ -95,13 +107,15 @@ export function ServerConsole({
         >
           {!running && (
             <p className="text-muted-foreground">
-              Serveur arrêté — démarre-le pour voir la console.
+              ⏹ Serveur arrêté — démarre-le pour voir la console.
             </p>
           )}
           {running && lines.length === 0 && (
             <p className="text-muted-foreground">Connexion à la console…</p>
           )}
-          {lines.map((line, index) =>
+          {/* Serveur arrêté : on n'affiche plus les anciennes lignes. */}
+          {running &&
+            lines.map((line, index) =>
             line === "SERVER_LOGS" ? (
               <div
                 key={index}

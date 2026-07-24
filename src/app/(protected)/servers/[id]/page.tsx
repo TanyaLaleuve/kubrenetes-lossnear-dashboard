@@ -101,35 +101,32 @@ export default async function ServerDetailPage({
           aria-label="Alimentation"
           className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4"
         >
-          {!running
-            ? can("control.start") && (
-                <ServerActionButton
-                  action={startServer.bind(null, server.id)}
-                  variant="accent"
-                >
-                  <Play className="size-4" aria-hidden />
-                  Démarrer
-                </ServerActionButton>
-              )
-            : (
-                <>
-                  {can("control.stop") && (
-                    <ServerActionButton action={stopServer.bind(null, server.id)}>
-                      <Square className="size-4" aria-hidden />
-                      Arrêter
-                    </ServerActionButton>
-                  )}
-                  {can("control.restart") && (
-                    <ServerActionButton
-                      action={restartServer.bind(null, server.id)}
-                    >
-                      <RotateCw className="size-4" aria-hidden />
-                      Redémarrer
-                    </ServerActionButton>
-                  )}
-                </>
-              )}
-          {/* Kill : arrêt dur, visible dès qu'un pod existe (même bloqué). */}
+          {/* Démarrer : seulement quand aucun pod ne tourne (vraiment arrêté),
+              pas pendant qu'un pod se termine. */}
+          {!status.pod && can("control.start") && (
+            <ServerActionButton
+              action={startServer.bind(null, server.id)}
+              variant="accent"
+            >
+              <Play className="size-4" aria-hidden />
+              Démarrer
+            </ServerActionButton>
+          )}
+          {/* Arrêter / Redémarrer : serveur démarré avec un pod présent. */}
+          {running && status.pod && can("control.stop") && (
+            <ServerActionButton action={stopServer.bind(null, server.id)}>
+              <Square className="size-4" aria-hidden />
+              Arrêter
+            </ServerActionButton>
+          )}
+          {running && status.pod && can("control.restart") && (
+            <ServerActionButton action={restartServer.bind(null, server.id)}>
+              <RotateCw className="size-4" aria-hidden />
+              Redémarrer
+            </ServerActionButton>
+          )}
+          {/* Kill : arrêt dur, tant qu'un pod existe (y compris bloqué à
+              l'arrêt) ; disparaît une fois vraiment arrêté (plus de pod). */}
           {status.pod && can("control.kill") && (
             <ServerActionButton
               action={killServer.bind(null, server.id)}
