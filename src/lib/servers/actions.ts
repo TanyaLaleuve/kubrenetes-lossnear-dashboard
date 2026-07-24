@@ -461,6 +461,11 @@ export async function restartServer(id: string) {
     throw new Error("Le serveur n'est pas démarré.");
   }
 
+  // Redémarrage volontaire : ne doit pas être compté comme un crash par le
+  // garde-fou anti crash-loop (le conteneur va sortir puis relancer).
+  const { noteExpectedRestart } = await import("./reconcile");
+  noteExpectedRestart(server.slug);
+
   const stop = server.stopCommand?.trim();
   if (stop && !stop.startsWith("^")) {
     // Le process quitte proprement puis kubelet relance le conteneur

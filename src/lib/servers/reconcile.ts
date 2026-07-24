@@ -9,13 +9,21 @@ import { applyServer, forceDeletePod, SERVERS_NAMESPACE } from "./k8s";
 // Anti crash-loop : si un serveur redémarre CRASH_THRESHOLD fois en moins de
 // WINDOW_MS, on le force à l'état "arrêté" au lieu de laisser Kubernetes le
 // relancer indéfiniment (CrashLoopBackOff).
-const WINDOW_MS = 45_000;
+const WINDOW_MS = 30_000;
 const CRASH_THRESHOLD = 2;
 const TICK_MS = 15_000;
 
 type Streak = { baseCount: number; since: number };
 const streaks = new Map<string, Streak>();
+// Redémarrages volontaires récents (bouton Redémarrer) : ils incrémentent aussi
+// restartCount, on ne doit pas les compter comme des crashs.
+const expectedRestart = new Map<string, number>();
 let started = false;
+
+/** Signale un redémarrage volontaire d'un serveur (à ne pas compter comme crash). */
+export function noteExpectedRestart(slug: string) {
+  expectedRestart.set(slug, Date.now());
+}
 
 // Quota disque : `local-path` n'en applique aucun, donc on arrête tout serveur
 // qui dépasse son quota — sinon il peut remplir la partition du nœud et
@@ -109,6 +117,17 @@ async function tick() {
       if (restarts === 0) {
         streaks.delete(server.slug);
         continue;
+      }
+
+      // Redémarrage volontaire récent : on re-baseline (ne compte pas ce
+      // restart comme un crash) et on ne déclenche pas le garde-fou.
+      const expected = expectedRestart.get(server.slug);
+      if (expected !== undefined) {
+        if (now - expected < WINDOW_MS) {
+          streaks.set(server.slug, { baseCount: restarts, since: now });
+          continue;
+        }
+        expectedRestart.delete(server.slug);
       }
 
       const prev = streaks.get(server.slug);
