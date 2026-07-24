@@ -120,7 +120,10 @@ export async function createBackupAction(
   const result = await performServerBackup(server, {
     createdBy: user.id,
     note,
-    rotate: false,
+    // Limite atteinte : la nouvelle sauvegarde écrase la plus ancienne (rotation)
+    // au lieu de bloquer. Borné par server.backupLimit, lui-même borné par le
+    // quota total du propriétaire — les deux limites restent respectées.
+    rotate: true,
   });
   if (result.error) return { error: result.error };
 

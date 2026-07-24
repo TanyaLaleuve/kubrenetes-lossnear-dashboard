@@ -53,6 +53,7 @@ export function BackupManager({
           <p className="text-xs text-muted-foreground">
             {used} / {limit} utilisée{limit > 1 ? "s" : ""}
             {limit === 0 && " — aucune allouée à ce serveur"}
+            {full && limit > 0 && " — la prochaine remplacera la plus ancienne"}
           </p>
         </div>
         {canCreate && limit > 0 && (
@@ -67,8 +68,12 @@ export function BackupManager({
             />
             <button
               type="submit"
-              disabled={pending || full}
-              title={full ? "Limite atteinte : supprime une sauvegarde d'abord." : undefined}
+              disabled={pending}
+              title={
+                full
+                  ? "Limite atteinte : la nouvelle sauvegarde remplacera la plus ancienne."
+                  : undefined
+              }
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-semibold text-accent-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
             >
               <Archive className="size-4" aria-hidden />

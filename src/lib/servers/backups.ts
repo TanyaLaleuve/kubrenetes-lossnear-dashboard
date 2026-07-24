@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { env } from "@/lib/env";
 import type { Server } from "@/lib/db/schema";
@@ -85,25 +85,13 @@ export async function performServerBackup(
   if (server.backupLimit <= 0) return { error: "Aucune sauvegarde allouée." };
 
   const existing = await serverManualBackupCount(server.id);
-  if (existing >= server.backupLimit) {
-    if (!opts.rotate) {
-      return {
-        error: `Limite atteinte (${existing}/${server.backupLimit}). Supprime une sauvegarde d'abord.`,
-      };
-    }
-    // Rotation : retire la ou les plus anciennes pour faire de la place.
-    const olds = await db()
-      .select({ id: schema.backups.id, slug: schema.backups.serverSlug })
-      .from(schema.backups)
-      .where(
-        and(eq(schema.backups.serverId, server.id), eq(schema.backups.kind, "manual")),
-      )
-      .orderBy(asc(schema.backups.createdAt))
-      .limit(existing - server.backupLimit + 1);
-    for (const old of olds) {
-      await agentDeleteArchive(old.slug, old.id).catch(() => {});
-      await db().delete(schema.backups).where(eq(schema.backups.id, old.id));
-    }
+  // Sans rotation : on bloque à la limite. Avec rotation, on laisse passer et on
+  // purge la/les plus anciennes APRÈS que la nouvelle soit créée avec succès
+  // (jamais avant : sinon un échec ferait perdre une sauvegarde sans remplaçante).
+  if (existing >= server.backupLimit && !opts.rotate) {
+    return {
+      error: `Limite atteinte (${existing}/${server.backupLimit}). Supprime une sauvegarde d'abord.`,
+    };
   }
 
   const [row] = await db()
@@ -132,6 +120,9 @@ export async function performServerBackup(
       .set({ sizeBytes: size })
       .where(eq(schema.backups.id, row.id));
     if (wasRunning) await setReplicas(server.slug, 1).catch(() => {});
+    // Rotation : la nouvelle sauvegarde existe, on peut purger les excédentaires
+    // les plus anciennes (la nouvelle est la plus récente, jamais visée).
+    if (opts.rotate) await pruneOldestManual(server.id, server.backupLimit);
     return { error: null, sizeBytes: size };
   } catch (error) {
     await db().delete(schema.backups).where(eq(schema.backups.id, row.id));
@@ -140,6 +131,26 @@ export async function performServerBackup(
     return {
       error: error instanceof Error ? error.message : "Échec de la sauvegarde.",
     };
+  }
+}
+
+/**
+ * Purge les sauvegardes manuelles les plus anciennes d'un serveur au-delà de
+ * `keep` (rotation : la plus récente écrase la plus ancienne). Ne touche jamais
+ * aux sauvegardes pre_delete (hors quota).
+ */
+async function pruneOldestManual(serverId: string, keep: number): Promise<void> {
+  const rows = await db()
+    .select({ id: schema.backups.id, slug: schema.backups.serverSlug })
+    .from(schema.backups)
+    .where(
+      and(eq(schema.backups.serverId, serverId), eq(schema.backups.kind, "manual")),
+    )
+    .orderBy(desc(schema.backups.createdAt))
+    .offset(Math.max(keep, 0));
+  for (const old of rows) {
+    await agentDeleteArchive(old.slug, old.id).catch(() => {});
+    await db().delete(schema.backups).where(eq(schema.backups.id, old.id));
   }
 }
 
