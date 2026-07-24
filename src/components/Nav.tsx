@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Archive,
   Boxes,
   Cog,
   Egg,
@@ -135,6 +136,12 @@ export function Nav({ user }: { user: NavUser }) {
                 label="Message builder"
                 icon={MessageSquare}
                 active={isActive(pathname, "/message-builder")}
+              />
+              <SidebarLink
+                href="/admin/backups"
+                label="Sauvegardes"
+                icon={Archive}
+                active={isActive(pathname, "/admin/backups")}
               />
               <SidebarLink
                 href="/admin/apparence"

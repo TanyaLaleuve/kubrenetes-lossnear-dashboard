@@ -23,6 +23,7 @@ export function serverNavProps(access: ServerAccess): {
       files: permissions.has("files.read"),
       members: permissions.has("members.read"),
       startup: privileged || permissions.has("settings.egg"),
+      backups: permissions.has("backups.read"),
       settings: canGeneral || canManage,
     },
     // Premier onglet réellement accessible, pour ne pas atterrir sur Général

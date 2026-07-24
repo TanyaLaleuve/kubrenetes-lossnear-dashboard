@@ -57,6 +57,16 @@ export const PERMISSION_GROUPS = [
       { key: "settings.manage", label: "Gestion (réinstaller, migrer)" },
     ],
   },
+  {
+    key: "backups",
+    label: "Sauvegardes",
+    perms: [
+      { key: "backups.read", label: "Voir les sauvegardes" },
+      { key: "backups.create", label: "Créer une sauvegarde" },
+      { key: "backups.restore", label: "Restaurer une sauvegarde" },
+      { key: "backups.delete", label: "Supprimer une sauvegarde" },
+    ],
+  },
 ] as const;
 
 export const ALL_PERMISSIONS: Permission[] = PERMISSION_GROUPS.flatMap((g) =>

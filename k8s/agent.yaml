@@ -32,6 +32,8 @@ spec:
           env:
             - name: STORAGE_ROOT
               value: /data-root
+            - name: BACKUP_ROOT
+              value: /backups
             - name: AGENT_TOKEN
               valueFrom:
                 secretKeyRef:
@@ -40,6 +42,8 @@ spec:
           volumeMounts:
             - name: storage
               mountPath: /data-root
+            - name: backups
+              mountPath: /backups
           resources:
             requests:
               cpu: 50m
@@ -58,6 +62,13 @@ spec:
             # Racine de stockage du local-path-provisioner (données des serveurs).
             path: /opt/local-path-provisioner
             type: Directory
+        - name: backups
+          hostPath:
+            # Archives de sauvegarde, dossier dédié créé si absent. Exclu des
+            # quotas serveurs ; un garde-fou d'espace libre évite qu'il remplisse
+            # le disque du nœud.
+            path: /opt/lossnear/backups
+            type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service

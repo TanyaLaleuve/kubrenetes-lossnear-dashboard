@@ -2,12 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, Rocket, Settings, Terminal, Users } from "lucide-react";
+import {
+  Archive,
+  FolderOpen,
+  Rocket,
+  Settings,
+  Terminal,
+  Users,
+} from "lucide-react";
 
 export type ServerNavTabs = {
   files: boolean;
   members: boolean;
   startup: boolean;
+  backups: boolean;
   settings: boolean;
 };
 
@@ -50,6 +58,13 @@ export function ServerNav({
       label: "Startup",
       icon: Rocket,
       show: tabs.startup,
+    },
+    {
+      href: `${base}/backups`,
+      exact: false,
+      label: "Sauvegardes",
+      icon: Archive,
+      show: tabs.backups,
     },
   ].filter((item) => item.show);
 

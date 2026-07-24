@@ -438,9 +438,72 @@ export async function restartServer(id: string) {
   revalidatePath(`/servers/${id}`);
 }
 
+/**
+ * Supprime un serveur en gardant une sauvegarde de secours (pre_delete),
+ * invisible au propriétaire, accessible aux seuls admins du site. La sauvegarde
+ * est prise AVANT la destruction du volume ; si elle échoue, la suppression est
+ * annulée (utiliser forceDeleteServer pour supprimer sans filet).
+ */
 export async function deleteServer(id: string) {
   const user = await currentUser();
-  // Action destructive : propriétaire ou admin uniquement.
+  const server = await requirePrivileged(user, id);
+
+  const { agentCreateArchive } = await import("./backups");
+  const { setReplicas, waitPodGone } = await import("./k8s");
+
+  // Arrêt propre pour une archive cohérente.
+  if (server.desiredState === "running") {
+    await setReplicas(server.slug, 0).catch(() => {});
+    await waitPodGone(server.slug);
+  }
+
+  const [row] = await db()
+    .insert(schema.backups)
+    .values({
+      serverId: server.id,
+      serverSlug: server.slug,
+      serverName: server.name,
+      ownerId: server.ownerId,
+      kind: "pre_delete",
+      note: "Sauvegarde automatique avant suppression",
+      createdBy: user.id,
+      sizeBytes: 0,
+    })
+    .returning({ id: schema.backups.id });
+
+  try {
+    const size = await agentCreateArchive(server.slug, row.id);
+    await db()
+      .update(schema.backups)
+      .set({ sizeBytes: size })
+      .where(eq(schema.backups.id, row.id));
+  } catch (error) {
+    // Sauvegarde impossible (espace, agent…) : on annule tout et on relance le
+    // serveur s'il tournait. L'admin peut libérer de l'espace ou forcer.
+    await db().delete(schema.backups).where(eq(schema.backups.id, row.id));
+    if (server.desiredState === "running") {
+      await setReplicas(server.slug, 1).catch(() => {});
+    }
+    throw new Error(
+      `Suppression annulée : la sauvegarde de secours a échoué (${
+        error instanceof Error ? error.message : "erreur"
+      }). Libère de l'espace, réessaie, ou utilise « Forcer la suppression ».`,
+    );
+  }
+
+  // serverId passera à null (FK on delete set null) : la sauvegarde survit.
+  await destroyServer(server);
+  await db().delete(schema.servers).where(eq(schema.servers.id, server.id));
+  revalidatePath("/servers");
+  redirect("/servers");
+}
+
+/**
+ * Supprime un serveur SANS sauvegarde de secours. Réservé au propriétaire/admin,
+ * pour les cas où la sauvegarde est inutile ou impossible (disque plein).
+ */
+export async function forceDeleteServer(id: string) {
+  const user = await currentUser();
   const server = await requirePrivileged(user, id);
   await destroyServer(server);
   await db().delete(schema.servers).where(eq(schema.servers.id, server.id));
@@ -907,6 +970,8 @@ const quotaSchema = z.object({
   quotaMemoryMi: z.coerce.number().int().min(0).max(262144),
   quotaCpuMilli: z.coerce.number().int().min(0).max(64000),
   quotaDiskGi: z.coerce.number().int().min(0).max(2000),
+  canBackup: z.coerce.boolean(),
+  backupQuota: z.coerce.number().int().min(0).max(1000),
   portAllowlist: z.string().trim().max(500).optional(),
 });
 
@@ -925,6 +990,8 @@ export async function updateUserGrants(
     quotaMemoryMi: formData.get("quotaMemoryMi"),
     quotaCpuMilli: formData.get("quotaCpuMilli"),
     quotaDiskGi: formData.get("quotaDiskGi"),
+    canBackup: formData.get("canBackup") === "on",
+    backupQuota: formData.get("backupQuota"),
     portAllowlist: formData.get("portAllowlist"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -951,6 +1018,8 @@ export async function updateUserGrants(
       quotaMemoryMi: parsed.data.quotaMemoryMi,
       quotaCpuMilli: parsed.data.quotaCpuMilli,
       quotaDiskGi: parsed.data.quotaDiskGi,
+      canBackup: parsed.data.canBackup,
+      backupQuota: parsed.data.backupQuota,
       portAllowlist,
       updatedAt: new Date(),
     })

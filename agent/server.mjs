@@ -19,6 +19,7 @@ import {
   rename,
   rm,
   stat,
+  statfs,
 } from "node:fs/promises";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
@@ -36,6 +37,14 @@ import { startSftp } from "./sftp.mjs";
 const execFileAsync = promisify(execFile);
 
 const STORAGE_ROOT = process.env.STORAGE_ROOT || "/data-root";
+// Racine des archives de sauvegarde, sur un chemin dédié du nœud (hostPath).
+const BACKUP_ROOT = process.env.BACKUP_ROOT || "/backups";
+// Marge de sécurité : refuse un backup si l'espace libre du nœud passerait
+// sous ce seuil, pour qu'un backup ne puisse jamais remplir le disque (et
+// entraîner etcd, les serveurs et Pterodactyl avec lui).
+const BACKUP_MIN_FREE_BYTES = Number(
+  process.env.BACKUP_MIN_FREE_BYTES || 20 * 1024 ** 3,
+);
 const TOKEN = process.env.AGENT_TOKEN || "";
 const PORT = Number(process.env.PORT || 8080);
 const SFTP_PORT = Number(process.env.SFTP_PORT || 2222);
@@ -47,6 +56,13 @@ const MAX_EDIT_BYTES = 2 * 1024 * 1024; // fichiers texte éditables : 2 Mo
 if (!TOKEN) {
   console.error("AGENT_TOKEN manquant");
   process.exit(1);
+}
+
+// Racine des backups créée au démarrage (hostPath monté vide au 1er boot).
+try {
+  mkdirSync(BACKUP_ROOT, { recursive: true });
+} catch {
+  // droit/point de montage : les routes backup échoueront proprement sinon
 }
 
 /** Host key SSH persistante sur le disque du nœud (stable entre redémarrages). */
@@ -182,6 +198,93 @@ async function diskUsage() {
   return diskScanning;
 }
 
+// ---- Sauvegardes (archives tar.gz du volume d'un serveur) ----
+
+/** Slug DNS-safe : sert de nom de dossier/fichier, à valider strictement. */
+function safeSlug(slug) {
+  if (!slug || !/^[a-z0-9-]{1,63}$/.test(slug)) throw new Error("slug invalide");
+  return slug;
+}
+
+/** Identifiant de backup (UUID) : nom de fichier de l'archive. */
+function safeBackupId(id) {
+  if (!id || !/^[a-z0-9-]{1,64}$/i.test(id)) throw new Error("id invalide");
+  return id;
+}
+
+function backupPath(slug, id) {
+  return join(BACKUP_ROOT, safeSlug(slug), `${safeBackupId(id)}.tar.gz`);
+}
+
+/** Espace disque libre (octets) sur le système de fichiers des backups. */
+async function freeBytes() {
+  try {
+    const s = await statfs(BACKUP_ROOT);
+    return s.bavail * s.bsize;
+  } catch {
+    return Number.POSITIVE_INFINITY; // en cas de doute, on ne bloque pas
+  }
+}
+
+/** Total occupé par les archives de backup (octets). */
+async function backupsUsage() {
+  try {
+    const { stdout } = await execFileAsync("du", ["-sk", BACKUP_ROOT], {
+      timeout: 120_000,
+      maxBuffer: 1 << 20,
+    });
+    const kb = Number.parseInt(stdout.trim().split(/\s+/)[0], 10);
+    return Number.isFinite(kb) ? kb * 1024 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Crée une archive tar.gz du volume `vol` sous BACKUP_ROOT/<slug>/<id>.tar.gz.
+ * Le serveur est censé être arrêté (cohérence) : l'agent ne gère que le disque.
+ */
+async function createBackup(vol, slug, id) {
+  const { base } = safePath(vol, "");
+  const free = await freeBytes();
+  if (free < BACKUP_MIN_FREE_BYTES) {
+    const err = new Error("espace disque insuffisant pour créer une sauvegarde");
+    err.status = 507;
+    throw err;
+  }
+  const out = backupPath(slug, id);
+  await mkdir(dirname(out), { recursive: true });
+  // -C base . : archive le contenu du volume (pas le dossier parent).
+  await execFileAsync("tar", ["-czf", out, "-C", base, "."], {
+    timeout: 30 * 60_000,
+    maxBuffer: 1 << 20,
+  });
+  const s = await stat(out);
+  return s.size;
+}
+
+/**
+ * Restaure une archive dans le volume : on vide le volume puis on ré-extrait.
+ * Destructif — l'appelant (dashboard) confirme et arrête le serveur avant.
+ */
+async function restoreBackup(vol, slug, id) {
+  const { base } = safePath(vol, "");
+  const archive = backupPath(slug, id);
+  await stat(archive); // 404 si absente
+  // Vide le volume sans supprimer le point de montage lui-même.
+  for (const entry of await readdir(base)) {
+    await rm(join(base, entry), { recursive: true, force: true });
+  }
+  await execFileAsync("tar", ["-xzf", archive, "-C", base], {
+    timeout: 30 * 60_000,
+    maxBuffer: 1 << 20,
+  });
+}
+
+async function deleteBackup(slug, id) {
+  await rm(backupPath(slug, id), { force: true });
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://agent");
@@ -196,6 +299,34 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && route === "/disk/usage") {
       const { at, volumes } = await diskUsage();
       return json(res, 200, { scannedAt: at, volumes });
+    }
+
+    // Espace des backups : pas de volume ciblé non plus.
+    if (req.method === "GET" && route === "/backup/usage") {
+      const [used, free] = await Promise.all([backupsUsage(), freeBytes()]);
+      return json(res, 200, { used, free, minFree: BACKUP_MIN_FREE_BYTES });
+    }
+
+    // Suppression d'un backup : ne cible pas un volume, juste slug + id.
+    if (req.method === "POST" && route === "/backup/delete") {
+      const slug = url.searchParams.get("slug") || "";
+      const id = url.searchParams.get("id") || "";
+      await deleteBackup(slug, id);
+      return json(res, 200, { ok: true });
+    }
+
+    // Téléchargement d'une archive de backup (admin, hors volume).
+    if (req.method === "GET" && route === "/backup/download") {
+      const slug = url.searchParams.get("slug") || "";
+      const id = url.searchParams.get("id") || "";
+      const path = backupPath(slug, id);
+      await stat(path);
+      res.writeHead(200, {
+        "Content-Type": "application/gzip",
+        "Content-Disposition": `attachment; filename="${safeSlug(slug)}-${safeBackupId(id)}.tar.gz"`,
+      });
+      await pipeline(createReadStream(path), res);
+      return;
     }
 
     const vol = url.searchParams.get("vol") || "";
@@ -257,10 +388,28 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // Création d'un backup : archive le volume `vol` (serveur arrêté en amont).
+    if (req.method === "POST" && route === "/backup/create") {
+      const slug = url.searchParams.get("slug") || "";
+      const id = url.searchParams.get("id") || "";
+      const size = await createBackup(vol, slug, id);
+      return json(res, 200, { ok: true, size });
+    }
+
+    // Restauration : ré-extrait l'archive dans le volume (destructif).
+    if (req.method === "POST" && route === "/backup/restore") {
+      const slug = url.searchParams.get("slug") || "";
+      const id = url.searchParams.get("id") || "";
+      await restoreBackup(vol, slug, id);
+      return json(res, 200, { ok: true });
+    }
+
     return json(res, 404, { error: "route inconnue" });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const status = message.includes("ENOENT") ? 404 : 400;
+    const status =
+      (error && typeof error === "object" && error.status) ||
+      (message.includes("ENOENT") ? 404 : 400);
     json(res, status, { error: message });
   }
 });

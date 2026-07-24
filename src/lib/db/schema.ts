@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
+  bigint,
   boolean,
   customType,
   integer,
@@ -64,6 +65,14 @@ export const users = pgTable(
     quotaMemoryMi: integer("quota_memory_mi").notNull().default(4096),
     quotaCpuMilli: integer("quota_cpu_milli").notNull().default(2000),
     quotaDiskGi: integer("quota_disk_gi").notNull().default(10),
+    /** Droit de créer des sauvegardes de ses serveurs (accordé par un admin). */
+    canBackup: boolean("can_backup").notNull().default(false),
+    /**
+     * Nombre total de sauvegardes que ce compte peut détenir, tous serveurs
+     * confondus. Le propriétaire répartit ce budget entre ses serveurs via
+     * servers.backupLimit (somme des backupLimit <= ce quota).
+     */
+    backupQuota: integer("backup_quota").notNull().default(0),
     /**
      * Ports externes autorisés (contraint choix manuel ET auto). Syntaxe libre :
      * ports et plages séparés par virgules, ex. "25601, 25605, 25610-25615".
@@ -143,6 +152,12 @@ export const servers = pgTable(
      * Défaut volontairement fermé ; ouvrir demande une permission dédiée.
      */
     isolated: boolean("isolated").notNull().default(true),
+    /**
+     * Nombre de sauvegardes manuelles allouées à ce serveur par son
+     * propriétaire (dans la limite de son quota total). 0 = aucune. Sert de
+     * plafond : au-delà, il faut supprimer une sauvegarde avant d'en créer.
+     */
+    backupLimit: integer("backup_limit").notNull().default(0),
     desiredState: serverState("desired_state").notNull().default("stopped"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -259,6 +274,45 @@ export const serverMembers = pgTable(
 );
 
 export type ServerMember = typeof serverMembers.$inferSelect;
+
+/**
+ * Type de sauvegarde :
+ * - "manual" : créée par le propriétaire, compte dans son quota, restaurable.
+ * - "pre_delete" : capture automatique de l'état juste avant suppression du
+ *   serveur, invisible au propriétaire (admin uniquement), hors quota.
+ */
+export const backupKind = pgEnum("backup_kind", ["manual", "pre_delete"]);
+
+/**
+ * Sauvegardes de serveurs (archive tar.gz du volume, stockée par l'agent).
+ * Les champs `server*` sont dénormalisés pour survivre à la suppression du
+ * serveur (cas des sauvegardes pre_delete) : la ligne reste après que le
+ * serveur a disparu.
+ */
+export const backups = pgTable("backups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** null après suppression du serveur (les pre_delete lui survivent). */
+  serverId: uuid("server_id").references(() => servers.id, {
+    onDelete: "set null",
+  }),
+  /** Slug K8s au moment du backup (sert de dossier de stockage). */
+  serverSlug: varchar("server_slug", { length: 40 }).notNull(),
+  /** Nom lisible au moment du backup. */
+  serverName: varchar("server_name", { length: 48 }).notNull(),
+  /** Propriétaire au moment du backup (pour l'affichage / regroupement). */
+  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+  kind: backupKind("kind").notNull().default("manual"),
+  /** Taille de l'archive en octets (0 tant que le backup n'est pas terminé). */
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull().default(0),
+  note: varchar("note", { length: 255 }),
+  /** Auteur (null pour une capture automatique avant suppression). */
+  createdBy: uuid("created_by").references(() => users.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Backup = typeof backups.$inferSelect;
 
 export const priceInterval = pgEnum("price_interval", ["hour", "month", "year"]);
 

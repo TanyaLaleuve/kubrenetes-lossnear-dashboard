@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import {
   AlertTriangle,
+  Archive,
   ArrowRightLeft,
   RefreshCw,
   ShieldCheck,
@@ -12,11 +13,16 @@ import { ConfirmButton } from "@/components/ConfirmButton";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import {
   deleteServer,
+  forceDeleteServer,
   migrateServerAction,
   reinstallServerAction,
   updateServerNetworkAction,
   type ServerFormState,
 } from "@/lib/servers/actions";
+import {
+  updateServerBackupLimitAction,
+  type BackupFormState,
+} from "@/lib/servers/backup-actions";
 import type { Server as ServerType } from "@/lib/db/schema";
 
 type NodeOption = {
@@ -30,6 +36,8 @@ export function ServerManagementForm({
   canManage,
   isPrivileged,
   canOpenNetwork,
+  backupsEnabled,
+  backupRemaining,
 }: {
   server: ServerType;
   nodes: NodeOption[];
@@ -39,6 +47,10 @@ export function ServerManagementForm({
   isPrivileged: boolean;
   /** Permission servers.network_open : lever le cloisonnement réseau. */
   canOpenNetwork: boolean;
+  /** Le propriétaire a-t-il le droit de faire des sauvegardes ? */
+  backupsEnabled: boolean;
+  /** Sauvegardes encore attribuables (quota total - déjà réparti ailleurs). */
+  backupRemaining: number;
 }) {
   const [reinstallState, reinstallAction, reinstallPending] = useActionState<
     ServerFormState,
@@ -54,6 +66,11 @@ export function ServerManagementForm({
     ServerFormState,
     FormData
   >(updateServerNetworkAction, {});
+
+  const [backupState, backupAction, backupPending] = useActionState<
+    BackupFormState,
+    FormData
+  >(updateServerBackupLimitAction, {});
 
   return (
     <div className="space-y-6">
@@ -232,7 +249,59 @@ export function ServerManagementForm({
         </form>
       </section>
 
-      {/* 4. Zone Dangereuse / Suppression */}
+      {/* 4. Allocation de sauvegardes (propriétaire, si autorisé) */}
+      {isPrivileged && backupsEnabled && (
+        <section aria-label="Sauvegardes" className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div>
+            <h2 className="text-base font-semibold flex items-center gap-2">
+              <Archive className="size-5 text-accent" /> Sauvegardes allouées
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              Nombre de sauvegardes que ce serveur peut conserver, pris sur ton
+              quota total. Encore attribuable ailleurs : {backupRemaining}.
+            </p>
+          </div>
+
+          {backupState.error && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3 text-xs text-destructive">
+              {backupState.error}
+            </div>
+          )}
+          {backupState.success && (
+            <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs text-accent">
+              {backupState.success}
+            </div>
+          )}
+
+          <form action={backupAction} className="flex flex-wrap items-end gap-3 pt-2 border-t border-border">
+            <input type="hidden" name="serverId" value={server.id} />
+            <div className="space-y-1">
+              <label htmlFor="backupLimit" className="text-xs font-medium text-muted-foreground">
+                Sauvegardes pour ce serveur
+              </label>
+              <input
+                id="backupLimit"
+                name="backupLimit"
+                type="number"
+                min={0}
+                max={backupRemaining}
+                defaultValue={server.backupLimit}
+                className="w-28 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={backupPending}
+              className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 disabled:opacity-50 transition-colors"
+            >
+              <Archive className="size-4" />
+              {backupPending ? "..." : "Enregistrer"}
+            </button>
+          </form>
+        </section>
+      )}
+
+      {/* 5. Zone Dangereuse / Suppression */}
       {isPrivileged && (
         <section aria-label="Zone dangereuse" className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 space-y-4">
           <div>
@@ -244,20 +313,40 @@ export function ServerManagementForm({
             </p>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-destructive/20">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-destructive/20">
+            <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">Supprimer le serveur</p>
               <p className="text-xs text-muted-foreground">
-                Cette action détruira définitivement le StatefulSet, le service et le disque de données.
+                Une sauvegarde de secours est prise automatiquement avant la
+                destruction (accessible aux admins du site). Le StatefulSet, le
+                service et le disque sont ensuite détruits.
               </p>
             </div>
 
             <ConfirmButton
               action={deleteServer.bind(null, server.id)}
-              confirmLabel="Oui, supprimer définitivement"
+              confirmLabel="Oui, supprimer (avec sauvegarde)"
             >
               <Trash2 className="size-4 mr-1.5" />
               Supprimer le serveur
+            </ConfirmButton>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-destructive/20">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Forcer la suppression</p>
+              <p className="text-xs text-muted-foreground">
+                Supprime sans sauvegarde de secours. Plus rapide, mais aucune
+                récupération possible ensuite.
+              </p>
+            </div>
+
+            <ConfirmButton
+              action={forceDeleteServer.bind(null, server.id)}
+              confirmLabel="Oui, supprimer sans sauvegarde"
+            >
+              <Trash2 className="size-4 mr-1.5" />
+              Forcer la suppression
             </ConfirmButton>
           </div>
         </section>

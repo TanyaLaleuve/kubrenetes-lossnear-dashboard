@@ -20,6 +20,8 @@ export function UserGrantsForm({
     quotaMemoryMi: number;
     quotaCpuMilli: number;
     quotaDiskGi: number;
+    canBackup: boolean;
+    backupQuota: number;
     portAllowlist: string | null;
   };
 }) {
@@ -38,6 +40,11 @@ export function UserGrantsForm({
           name="isAdmin"
           defaultChecked={user.isAdmin}
           label="Administrateur"
+        />
+        <ToggleSwitch
+          name="canBackup"
+          defaultChecked={user.canBackup}
+          label="Peut faire des sauvegardes"
         />
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -82,6 +89,17 @@ export function UserGrantsForm({
             min={0}
             max={2000}
             defaultValue={user.quotaDiskGi}
+            className={inputClass}
+          />
+        </label>
+        <label className="space-y-1 text-xs text-muted-foreground">
+          Sauvegardes (total)
+          <input
+            name="backupQuota"
+            type="number"
+            min={0}
+            max={1000}
+            defaultValue={user.backupQuota}
             className={inputClass}
           />
         </label>

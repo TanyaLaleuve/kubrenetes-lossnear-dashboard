@@ -323,6 +323,31 @@ export async function clusterHostPorts(): Promise<Set<number>> {
   return ports;
 }
 
+/**
+ * Attend la disparition du pod d'un serveur (après scale à 0), pour garantir un
+ * arrêt propre avant une opération sur le disque (sauvegarde cohérente).
+ * Renvoie true si le pod a bien disparu dans le délai imparti.
+ */
+export async function waitPodGone(
+  slug: string,
+  timeoutMs = 90_000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  const core = coreApi();
+  while (Date.now() < deadline) {
+    try {
+      await core.readNamespacedPod({
+        namespace: SERVERS_NAMESPACE,
+        name: `${slug}-0`,
+      });
+    } catch (error) {
+      if (await isNotFound(error)) return true;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
+}
+
 /** Supprime le pod immédiatement (grace period 0) — arrêt dur. */
 export async function forceDeletePod(slug: string): Promise<void> {
   try {

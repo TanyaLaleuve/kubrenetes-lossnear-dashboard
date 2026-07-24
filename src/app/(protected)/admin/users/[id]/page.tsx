@@ -38,6 +38,8 @@ export default async function AdminUserDetailPage({
       quotaMemoryMi: schema.users.quotaMemoryMi,
       quotaCpuMilli: schema.users.quotaCpuMilli,
       quotaDiskGi: schema.users.quotaDiskGi,
+      canBackup: schema.users.canBackup,
+      backupQuota: schema.users.backupQuota,
       portAllowlist: schema.users.portAllowlist,
       hasAvatar: sql<boolean>`${schema.users.avatar} is not null`,
       serverCount: sql<number>`(
