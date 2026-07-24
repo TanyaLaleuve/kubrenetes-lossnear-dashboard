@@ -153,9 +153,10 @@ export function ServerManagementForm({
             <label htmlFor="nodeName" className="text-xs font-medium text-muted-foreground">
               Nœud Kubernetes cible
             </label>
+            {/* name="node" et non "nodeName" : ce dernier masque form.nodeName. */}
             <select
               id="nodeName"
-              name="nodeName"
+              name="node"
               defaultValue={server.nodeName ?? "auto"}
               disabled={!canManage}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none disabled:opacity-50"

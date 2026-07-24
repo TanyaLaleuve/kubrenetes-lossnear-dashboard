@@ -48,7 +48,9 @@ export function NodeMetaEditor({
         )}
       </summary>
       <form action={action} className="space-y-2 border-t border-border p-3">
-        <input type="hidden" name="nodeName" value={nodeName} />
+        {/* Ne PAS nommer ce champ « nodeName » : il masquerait la propriété DOM
+            form.nodeName (« FORM »), ce qui casse React et les extensions. */}
+        <input type="hidden" name="node" value={nodeName} />
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="space-y-1 text-xs text-muted-foreground">
             Hébergeur (libellé)

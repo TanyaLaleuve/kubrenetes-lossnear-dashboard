@@ -45,16 +45,11 @@ export async function updateNodeMeta(
   _prev: NodeMetaFormState,
   formData: FormData,
 ): Promise<NodeMetaFormState> {
-  console.log("[updateNodeMeta] appelée", {
-    nodeName: formData.get("nodeName"),
-    hostingLabel: formData.get("hostingLabel"),
-    priceAmount: formData.get("priceAmount"),
-  });
   const user = await currentUser();
   if (!user.isAdmin) return { error: "Réservé aux admins." };
 
   const parsed = metaSchema.safeParse({
-    nodeName: formData.get("nodeName"),
+    nodeName: formData.get("node"),
     hostingUrl: formData.get("hostingUrl") ?? "",
     hostingLabel: formData.get("hostingLabel") ?? "",
     priceAmount: formData.get("priceAmount") || undefined,

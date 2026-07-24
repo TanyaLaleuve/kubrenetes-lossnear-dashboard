@@ -776,7 +776,7 @@ export async function migrateServerAction(
   const serverId = String(formData.get("serverId") ?? "");
   const server = await requireServerPermission(user, serverId, "settings.manage");
 
-  const targetNode = String(formData.get("nodeName") ?? "").trim();
+  const targetNode = String(formData.get("node") ?? "").trim();
   const nodeName = targetNode === "" || targetNode === "auto" ? null : targetNode;
 
   const [updated] = await db()
