@@ -152,6 +152,9 @@ export async function GET(
       let installFollowed = -1;
       // Séparateur « logs serveur » déjà envoyé pour le run en cours.
       let separatorSent = false;
+      // Identité du run courant (pod + nb de redémarrages). Un changement = un
+      // nouveau démarrage : on vide la console pour ne garder que ce run.
+      let lastRunKey = "";
 
       while (!closed) {
         let pod = null;
@@ -169,10 +172,19 @@ export async function GET(
             send("[système] En attente de la création du pod…");
             waitingNotified = true;
           }
+          lastRunKey = "";
           await sleep(2500);
           continue;
         }
         waitingNotified = false;
+
+        // Nouveau run (pod recréé ou conteneur redémarré) : reset de la console.
+        const runKey = `${pod.metadata?.uid ?? ""}:${pod.status?.containerStatuses?.[0]?.restartCount ?? 0}`;
+        if (runKey !== lastRunKey) {
+          lastRunKey = runKey;
+          separatorSent = false;
+          send("CONSOLE_RESET");
+        }
 
         await emitPodEvents();
 
@@ -213,8 +225,7 @@ export async function GET(
 
         const state = pod.status?.containerStatuses?.[0]?.state;
         if (state?.running) {
-          // Séparateur envoyé une seule fois par run : le client vide la console
-          // à ce signal, pour ne pas cumuler les logs des démarrages précédents.
+          // Divider « logs serveur » : une seule fois par run.
           if (!separatorSent) {
             send(SEPARATOR);
             separatorSent = true;
@@ -224,9 +235,6 @@ export async function GET(
           if (!closed) {
             send("[système] Flux de logs interrompu, reconnexion…");
           }
-        } else {
-          // Conteneur pas (plus) en cours : le prochain démarrage videra à nouveau.
-          separatorSent = false;
         }
         await sleep(2000);
       }

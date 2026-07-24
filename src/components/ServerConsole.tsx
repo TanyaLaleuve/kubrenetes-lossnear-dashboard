@@ -34,9 +34,9 @@ export function ServerConsole({
     source.onopen = () => setLines([]);
     source.onmessage = (event) => {
       const clean = (event.data as string).replace(ANSI_PATTERN, "");
-      // Début d'un run : on vide la console pour ne pas cumuler les logs (et les
-      // événements [système]) des démarrages précédents.
-      if (clean === "SERVER_LOGS") {
+      // Nouveau run : on vide la console pour ne garder que le run courant (ses
+      // événements [système] compris). SERVER_LOGS reste un simple séparateur.
+      if (clean === "CONSOLE_RESET") {
         setLines([]);
         return;
       }
