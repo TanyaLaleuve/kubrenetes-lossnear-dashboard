@@ -13,7 +13,10 @@ export default async function ImagesPage() {
   if (!user.isAdmin) redirect("/servers");
 
   const [rows, eggs] = await Promise.all([
-    db().select().from(schema.dockerImages).orderBy(asc(schema.dockerImages.reference)),
+    db()
+      .select()
+      .from(schema.dockerImages)
+      .orderBy(asc(schema.dockerImages.sortOrder), asc(schema.dockerImages.reference)),
     db().select({ dockerImages: schema.eggs.dockerImages }).from(schema.eggs),
   ]);
 
@@ -31,6 +34,7 @@ export default async function ImagesPage() {
     label: r.label,
     category: r.category,
     source: r.source,
+    sortOrder: r.sortOrder,
     usedBy: usage.get(r.reference) ?? 0,
   }));
 

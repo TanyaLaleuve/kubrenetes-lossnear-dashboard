@@ -27,6 +27,7 @@ export function serverNavProps(access: ServerAccess): {
       ai: permissions.has("ai.use"),
       schedules: permissions.has("schedules.read"),
       settings: canGeneral || canManage,
+      activity: permissions.has("activity.read"),
     },
     // Premier onglet réellement accessible, pour ne pas atterrir sur Général
     // sans en avoir la permission.

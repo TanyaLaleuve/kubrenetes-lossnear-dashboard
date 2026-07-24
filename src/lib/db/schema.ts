@@ -225,6 +225,8 @@ export const eggs = pgTable("eggs", {
     .notNull()
     .default([]),
   source: eggSource("source").notNull().default("custom"),
+  /** Ordre manuel (glisser-déposer) au sein de sa catégorie ; petit = en haut. */
+  sortOrder: integer("sort_order").notNull().default(0),
   createdBy: uuid("created_by").references(() => users.id, {
     onDelete: "set null",
   }),
@@ -251,6 +253,8 @@ export const dockerImages = pgTable("docker_images", {
   /** Catégorie libre pour le regroupement (ex. "Minecraft", "Bots"). */
   category: varchar("category", { length: 64 }),
   source: imageSource("source").notNull().default("manual"),
+  /** Ordre manuel (glisser-déposer) ; petit = en haut. */
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -339,6 +343,11 @@ export const schedules = pgTable("schedules", {
   /** Expression cron 5 champs : min heure jour-mois mois jour-semaine. */
   cron: varchar("cron", { length: 128 }).notNull(),
   enabled: boolean("enabled").notNull().default(true),
+  /**
+   * N'exécuter que si le serveur est en ligne : si activé et que le pod n'est
+   * pas en cours d'exécution, la planification est ignorée (aucune tâche jouée).
+   */
+  onlyWhenOnline: boolean("only_when_online").notNull().default(false),
   lastRunAt: timestamp("last_run_at", { withTimezone: true }),
   lastStatus: scheduleStatus("last_status"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -443,3 +452,38 @@ export const appSettings = pgTable("app_settings", {
 });
 
 export type AppSettings = typeof appSettings.$inferSelect;
+
+/**
+ * Journal d'activité d'un serveur (lecture seule, façon Pterodactyl) : trace
+ * qui a fait quoi (démarrage, commande, upload, suppression, changement de
+ * paramètre…). Les champs acteur sont dénormalisés (`actorName`) pour survivre
+ * à la suppression du compte. `null` sur `userId` = action système (cron, IA
+ * sans compte, réconciliateur).
+ */
+export const activityLogs = pgTable(
+  "activity_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    serverId: uuid("server_id")
+      .notNull()
+      .references(() => servers.id, { onDelete: "cascade" }),
+    /** Auteur de l'action ; null si déclenchée par le système. */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** Nom de l'acteur figé au moment de l'action (compte supprimé, cron…). */
+    actorName: varchar("actor_name", { length: 64 }).notNull(),
+    /** Clé d'action stable (ex. "server.start", "file.upload"). */
+    action: varchar("action", { length: 48 }).notNull(),
+    /** Détail lisible libre (cible, paramètre modifié…). */
+    detail: varchar("detail", { length: 512 }).notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("activity_logs_server_created_idx").on(
+      table.serverId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+);
+
+export type ActivityLog = typeof activityLogs.$inferSelect;

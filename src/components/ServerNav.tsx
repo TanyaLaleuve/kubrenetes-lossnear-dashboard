@@ -7,6 +7,7 @@ import {
   CalendarClock,
   FolderOpen,
   Rocket,
+  ScrollText,
   Settings,
   Sparkles,
   Terminal,
@@ -21,6 +22,7 @@ export type ServerNavTabs = {
   ai: boolean;
   schedules: boolean;
   settings: boolean;
+  activity: boolean;
 };
 
 /**
@@ -110,6 +112,15 @@ export function ServerNav({
           active={settingsActive}
         />
       )}
+      {tabs.activity && (
+        <NavLink
+          href={`${base}/activity`}
+          label="Activité"
+          icon={ScrollText}
+          active={pathname.startsWith(`${base}/activity`)}
+          className="ml-auto"
+        />
+      )}
     </nav>
   );
 }
@@ -119,17 +130,19 @@ function NavLink({
   label,
   icon: Icon,
   active,
+  className = "",
 }: {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
+  className?: string;
 }) {
   return (
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors duration-150 ${
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm transition-colors duration-150 ${className} ${
         active
           ? "border-accent/20 bg-accent/15 font-semibold text-accent"
           : "border-border text-muted-foreground hover:bg-card-hover hover:text-foreground"

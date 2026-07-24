@@ -178,3 +178,22 @@ export async function deleteEgg(id: string) {
   revalidatePath("/eggs");
   redirect("/eggs");
 }
+
+/**
+ * Réordonne des eggs (glisser-déposer). `ids` = ordre voulu ; chaque egg reçoit
+ * `sortOrder` = son rang dans la liste. Appelé par catégorie côté client.
+ */
+export async function reorderEggs(ids: string[]) {
+  await requireAdmin();
+  const uuid = z.string().uuid();
+  const clean = ids.filter((id) => uuid.safeParse(id).success);
+  await db().transaction(async (tx) => {
+    for (let i = 0; i < clean.length; i++) {
+      await tx
+        .update(schema.eggs)
+        .set({ sortOrder: i })
+        .where(eq(schema.eggs.id, clean[i]));
+    }
+  });
+  revalidatePath("/eggs");
+}

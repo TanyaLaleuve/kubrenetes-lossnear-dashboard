@@ -42,6 +42,7 @@ type ScheduleItem = {
   name: string;
   cron: string;
   enabled: boolean;
+  onlyWhenOnline: boolean;
   lastRunAt: Date | null;
   lastStatus: "ok" | "error" | "running" | null;
   tasks: {
@@ -210,6 +211,9 @@ function ScheduleForm({
   const [name, setName] = useState(schedule?.name ?? "");
   const [cron, setCron] = useState(schedule?.cron ?? "0 4 * * *");
   const [enabled, setEnabled] = useState(schedule?.enabled ?? true);
+  const [onlyWhenOnline, setOnlyWhenOnline] = useState(
+    schedule?.onlyWhenOnline ?? false,
+  );
   const [tasks, setTasks] = useState<Task[]>(
     schedule?.tasks.map((t) => ({
       type: t.type,
@@ -235,6 +239,7 @@ function ScheduleForm({
         name,
         cron,
         enabled,
+        onlyWhenOnline,
         tasks,
       });
       if (result.error) setError(result.error);
@@ -307,13 +312,18 @@ function ScheduleForm({
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <ToggleSwitch checked={enabled} onChange={setEnabled} label="Activée" />
+        <ToggleSwitch
+          checked={onlyWhenOnline}
+          onChange={setOnlyWhenOnline}
+          label="Ne pas exécuter si le serveur est éteint"
+        />
         <button
           type="button"
           onClick={save}
           disabled={busy || !name.trim()}
-          className="ml-auto inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50"
+          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 sm:ml-auto"
         >
           {busy ? "…" : "Enregistrer"}
         </button>

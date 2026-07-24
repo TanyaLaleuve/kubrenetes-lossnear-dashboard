@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { desc } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { Egg as EggIcon, Plus, Upload } from "lucide-react";
 import { redirect } from "next/navigation";
 import { currentUser } from "@/lib/auth/user";
 import { db, schema } from "@/lib/db";
+import { EggBoard, type EggGroup } from "@/components/EggBoard";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +17,10 @@ export default async function EggsPage() {
   const eggs = await db()
     .select()
     .from(schema.eggs)
-    .orderBy(desc(schema.eggs.createdAt));
+    .orderBy(asc(schema.eggs.sortOrder), asc(schema.eggs.name));
 
-  // Regroupement par catégorie, "Sans catégorie" en dernier.
+  // Regroupement par catégorie, "Sans catégorie" en dernier. L'ordre au sein
+  // d'une catégorie suit sortOrder (glisser-déposer).
   const byCategory = new Map<string, typeof eggs>();
   for (const egg of eggs) {
     const key = egg.category?.trim() || "Sans catégorie";
@@ -26,11 +28,23 @@ export default async function EggsPage() {
     list.push(egg);
     byCategory.set(key, list);
   }
-  const groupedEggs = [...byCategory.entries()].sort(([a], [b]) => {
-    if (a === "Sans catégorie") return 1;
-    if (b === "Sans catégorie") return -1;
-    return a.localeCompare(b, "fr");
-  });
+  const groups: EggGroup[] = [...byCategory.entries()]
+    .sort(([a], [b]) => {
+      if (a === "Sans catégorie") return 1;
+      if (b === "Sans catégorie") return -1;
+      return a.localeCompare(b, "fr");
+    })
+    .map(([category, list]) => ({
+      category,
+      eggs: list.map((egg) => ({
+        id: egg.id,
+        name: egg.name,
+        description: egg.description,
+        source: egg.source,
+        imageCount: Object.keys(egg.dockerImages).length,
+        varCount: egg.variables.length,
+      })),
+    }));
 
   return (
     <div className="space-y-6">
@@ -71,50 +85,12 @@ export default async function EggsPage() {
           </p>
         </div>
       ) : (
-        groupedEggs.map(([category, list]) => (
-        <section key={category} className="space-y-2">
-          <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {category}
-            <span className="rounded-full bg-card px-1.5 py-0.5 text-[10px]">
-              {list.length}
-            </span>
-          </h2>
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {list.map((egg) => (
-            <li key={egg.id}>
-              <Link
-                href={`/eggs/${egg.id}`}
-                className="block rounded-xl border border-border bg-card p-4 transition-colors duration-150 hover:bg-card-hover"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-semibold">{egg.name}</p>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      egg.source === "imported"
-                        ? "bg-info/10 text-info"
-                        : "bg-accent/10 text-accent"
-                    }`}
-                  >
-                    {egg.source === "imported" ? "importé" : "maison"}
-                  </span>
-                </div>
-                {egg.description && (
-                  <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
-                    {egg.description}
-                  </p>
-                )}
-                <p className="mt-2 font-mono text-xs text-muted-foreground">
-                  {Object.keys(egg.dockerImages).length} image
-                  {Object.keys(egg.dockerImages).length > 1 ? "s" : ""} ·{" "}
-                  {egg.variables.length} variable
-                  {egg.variables.length > 1 ? "s" : ""}
-                </p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-        </section>
-        ))
+        <>
+          <p className="text-xs text-muted-foreground">
+            Glisse-dépose les cartes pour réorganiser une catégorie.
+          </p>
+          <EggBoard groups={groups} />
+        </>
       )}
     </div>
   );

@@ -30,6 +30,7 @@ export default async function ServerSchedulesPage({
     name: s.name,
     cron: s.cron,
     enabled: s.enabled,
+    onlyWhenOnline: s.onlyWhenOnline,
     lastRunAt: s.lastRunAt,
     lastStatus: s.lastStatus,
     tasks: s.tasks.map((t) => ({

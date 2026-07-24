@@ -1,0 +1,1 @@
+ALTER TABLE "schedules" ADD COLUMN "only_when_online" boolean DEFAULT false NOT NULL;

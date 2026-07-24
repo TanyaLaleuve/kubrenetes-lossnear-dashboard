@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
 import { requireServerPermission, serverAccess } from "./authz";
+import { logActivity } from "./activity";
 import {
   agentDeleteArchive,
   agentRestoreArchive,
@@ -123,6 +124,12 @@ export async function createBackupAction(
   });
   if (result.error) return { error: result.error };
 
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "backup.create",
+    detail: note ? `Sauvegarde créée : ${note}` : "Sauvegarde créée",
+  });
   revalidate(server.shortId, server.id);
   return { success: "Sauvegarde créée." };
 }
@@ -157,6 +164,12 @@ export async function restoreBackupAction(
   }
   if (wasRunning) await setReplicas(server.slug, 1).catch(() => {});
 
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "backup.restore",
+    detail: backup.note ? `Restauration : ${backup.note}` : "Sauvegarde restaurée",
+  });
   revalidate(server.shortId, server.id);
   return { success: "Sauvegarde restaurée." };
 }
@@ -179,6 +192,12 @@ export async function deleteBackupAction(
   await agentDeleteArchive(server.slug, backup.id).catch(() => {});
   await db().delete(schema.backups).where(eq(schema.backups.id, backup.id));
 
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "backup.delete",
+    detail: backup.note ? `Sauvegarde supprimée : ${backup.note}` : "Sauvegarde supprimée",
+  });
   revalidate(server.shortId, server.id);
   return { success: "Sauvegarde supprimée." };
 }

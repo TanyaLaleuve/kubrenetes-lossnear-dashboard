@@ -5,7 +5,8 @@ import type { Schedule, ScheduleTask, Server } from "@/lib/db/schema";
 import { performServerBackup } from "@/lib/servers/backups";
 import { agentFetch, resolveVolumeDir } from "@/lib/servers/files";
 import { sendConsoleCommand } from "@/lib/servers/exec";
-import { forceDeletePod, setReplicas } from "@/lib/servers/k8s";
+import { forceDeletePod, setReplicas, serverRuntimeStatus } from "@/lib/servers/k8s";
+import { logActivity } from "@/lib/servers/activity";
 import { cronMatches } from "./cron";
 
 const TICK_MS = 60_000;
@@ -66,6 +67,31 @@ export async function executeSchedule(scheduleId: string): Promise<void> {
       .limit(1);
     if (!schedule) return;
 
+    // « N'exécuter que si en ligne » : si le pod n'est pas prêt, on ignore la
+    // planification sans jouer aucune tâche (trace tout de même l'exécution).
+    if (schedule.onlyWhenOnline) {
+      const [server] = await db()
+        .select()
+        .from(schema.servers)
+        .where(eq(schema.servers.id, schedule.serverId))
+        .limit(1);
+      const online = server
+        ? (await serverRuntimeStatus(server).catch(() => null))?.label === "Running"
+        : false;
+      if (!online) {
+        await db()
+          .update(schema.schedules)
+          .set({ lastRunAt: new Date(), lastStatus: "ok" })
+          .where(eq(schema.schedules.id, scheduleId));
+        await db().insert(schema.scheduleRuns).values({
+          scheduleId,
+          status: "ok",
+          detail: "ignoré : serveur hors ligne",
+        });
+        return;
+      }
+    }
+
     await db()
       .update(schema.schedules)
       .set({ lastRunAt: new Date(), lastStatus: "running" })
@@ -113,6 +139,12 @@ export async function executeSchedule(scheduleId: string): Promise<void> {
       scheduleId,
       status,
       detail: log.join("\n") || "(aucune tâche)",
+    });
+    await logActivity({
+      serverId: schedule.serverId,
+      actor: { system: "Planificateur" },
+      action: "schedule.run",
+      detail: `« ${schedule.name} » — ${status === "ok" ? "réussi" : "échec"}`,
     });
     // Purge de l'historique au-delà des N plus récents.
     const olds = await db()

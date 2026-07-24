@@ -105,6 +105,25 @@ export async function deleteImage(id: string) {
 }
 
 /**
+ * Réordonne des images (glisser-déposer). `ids` = ordre voulu ; chaque image
+ * reçoit `sortOrder` = son rang.
+ */
+export async function reorderImages(ids: string[]) {
+  await requireAdmin();
+  const uuid = z.string().uuid();
+  const clean = ids.filter((id) => uuid.safeParse(id).success);
+  await db().transaction(async (tx) => {
+    for (let i = 0; i < clean.length; i++) {
+      await tx
+        .update(schema.dockerImages)
+        .set({ sortOrder: i })
+        .where(eq(schema.dockerImages.id, clean[i]));
+    }
+  });
+  revalidatePath("/images");
+}
+
+/**
  * Ajoute au catalogue les images d'un egg (à l'import/sauvegarde). N'écrase
  * pas une entrée existante (catégorie/libellé posés à la main sont conservés).
  * Appelé côté serveur depuis les actions d'egg — pas une action de formulaire.

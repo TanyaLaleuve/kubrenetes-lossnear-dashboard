@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
 import { requirePrivileged, requireServerPermission, serverAccess } from "./authz";
+import { logActivity } from "./activity";
 import { DEFAULT_IMAGE } from "./constants";
 import { DEFAULT_MEMBER_PERMISSIONS, sanitizePermissions } from "./permissions";
 import { builtinVars, EGG_MOUNT_PATH, isMinecraftEgg, resolveEnv } from "./eggs";
@@ -427,6 +428,12 @@ async function setDesiredState(
     .where(eq(schema.servers.id, server.id))
     .returning();
   await applyServer(updated);
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: state === "running" ? "server.start" : "server.stop",
+    detail: state === "running" ? "Démarrage" : "Arrêt",
+  });
   revalidatePath(`/servers/${id}`);
   revalidatePath("/servers");
 }
@@ -459,6 +466,12 @@ export async function stopServer(id: string) {
     .where(eq(schema.servers.id, server.id))
     .returning();
   await applyServer(updated); // scale à 0 (SIGTERM + grâce 30 s)
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "server.stop",
+    detail: "Arrêt",
+  });
   revalidatePath(`/servers/${id}`);
   revalidatePath("/servers");
 }
@@ -474,6 +487,12 @@ export async function killServer(id: string) {
     .returning();
   await applyServer(updated); // scale à 0
   await forceDeletePod(server.slug); // supprime le pod sans délai de grâce
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "server.kill",
+    detail: "Kill (arrêt forcé)",
+  });
   revalidatePath(`/servers/${id}`);
   revalidatePath("/servers");
 }
@@ -508,6 +527,12 @@ export async function restartServer(id: string) {
     await setReplicas(server.slug, 1).catch(() => {});
   }
 
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "server.restart",
+    detail: "Redémarrage",
+  });
   revalidatePath(`/servers/${id}`);
   revalidatePath("/servers");
 }
@@ -703,6 +728,12 @@ export async function updateServerGeneralSettings(
     .returning();
 
   await updateServerWorkload(updated);
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "settings.update",
+    detail: "Paramètres généraux modifiés",
+  });
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings`);
   revalidatePath("/servers");
@@ -768,6 +799,12 @@ export async function updateServerEggSettings(
     .returning();
 
   await updateServerWorkload(updated);
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "startup.update",
+    detail: "Configuration de démarrage modifiée",
+  });
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${server.shortId}/startup`);
   return { success: "Configuration enregistrée." };
@@ -998,6 +1035,12 @@ export async function addMember(
     })
     .onConflictDoNothing();
 
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "member.add",
+    detail: `Membre ajouté : ${identifier}`,
+  });
   revalidateMemberPages(server);
   return { success: `« ${identifier} » ajouté au serveur.` };
 }
@@ -1023,6 +1066,12 @@ export async function updateMemberPermissions(
         eq(schema.serverMembers.userId, memberId),
       ),
     );
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "member.update",
+    detail: "Permissions d'un membre modifiées",
+  });
   revalidateMemberPages(server);
   return { success: "Permissions enregistrées." };
 }
@@ -1038,6 +1087,12 @@ export async function removeMember(serverId: string, memberId: string) {
         eq(schema.serverMembers.userId, memberId),
       ),
     );
+  await logActivity({
+    serverId: server.id,
+    actor: user,
+    action: "member.remove",
+    detail: "Membre retiré",
+  });
   revalidateMemberPages(server);
 }
 

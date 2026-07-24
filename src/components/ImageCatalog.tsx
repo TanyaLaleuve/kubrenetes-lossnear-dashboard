@@ -1,10 +1,20 @@
 "use client";
 
 import { useActionState, useMemo, useState, useTransition } from "react";
-import { Copy, Check, Package, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  Copy,
+  Check,
+  GripVertical,
+  Package,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import {
   addImage,
   deleteImage,
+  reorderImages,
   updateImage,
   type ImageFormState,
 } from "@/lib/images/actions";
@@ -21,11 +31,12 @@ export type CatalogItem = {
   label: string | null;
   category: string | null;
   source: "manual" | "egg";
+  sortOrder: number;
   usedBy: number;
 };
 
 type GroupBy = "category" | "registry" | "none";
-type SortBy = "name" | "usage";
+type SortBy = "name" | "usage" | "manual";
 
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -130,17 +141,38 @@ function AddForm({ categories }: { categories: string[] }) {
 function ImageRow({
   item,
   categories,
+  drag,
 }: {
   item: CatalogItem;
   categories: string[];
+  drag?: {
+    dragging: boolean;
+    onDragStart: () => void;
+    onDragEnd: () => void;
+    onDrop: () => void;
+  };
 }) {
   const [state, action, pending] = useActionState(updateImage, initialState);
   const [removing, startRemove] = useTransition();
   const parsed = parseImageRef(item.reference);
 
   return (
-    <li className="rounded-xl border border-border bg-card p-3">
+    <li
+      draggable={!!drag}
+      onDragStart={drag?.onDragStart}
+      onDragEnd={drag?.onDragEnd}
+      onDragOver={drag ? (e) => e.preventDefault() : undefined}
+      onDrop={drag?.onDrop}
+      className={`rounded-xl border bg-card p-3 ${
+        drag?.dragging ? "border-accent/50 opacity-60" : "border-border"
+      }`}
+    >
       <div className="flex items-center gap-2">
+        {drag && (
+          <span className="shrink-0 cursor-grab text-muted-foreground active:cursor-grabbing" aria-hidden>
+            <GripVertical className="size-4" />
+          </span>
+        )}
         <Package className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">
@@ -326,13 +358,28 @@ export function ImageCatalog({ items }: { items: CatalogItem[] }) {
           >
             <option value="name">Nom</option>
             <option value="usage">Utilisation</option>
+            <option value="manual">Manuel (glisser-déposer)</option>
           </select>
         </label>
       </div>
 
       <AddForm categories={categories} />
 
-      {groups.length === 0 ? (
+      {sort === "manual" ? (
+        <ManualImageList
+          key={query}
+          items={items.filter((i) => {
+            const q = query.trim().toLowerCase();
+            return (
+              !q ||
+              i.reference.toLowerCase().includes(q) ||
+              (i.label ?? "").toLowerCase().includes(q)
+            );
+          })}
+          reorderable={query.trim() === ""}
+          categories={categories}
+        />
+      ) : groups.length === 0 ? (
         <p className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
           Aucune image. Ajoute-en une ou importe un egg.
         </p>
@@ -357,6 +404,86 @@ export function ImageCatalog({ items }: { items: CatalogItem[] }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Liste plate réordonnable par glisser-déposer (mode « Manuel »). L'ordre est
+ * persisté (sortOrder). Désactivée pendant une recherche pour ne pas réindexer
+ * partiellement le catalogue.
+ */
+function ManualImageList({
+  items,
+  reorderable,
+  categories,
+}: {
+  items: CatalogItem[];
+  reorderable: boolean;
+  categories: string[];
+}) {
+  // Ordre local optionnel (ids). On dérive la liste affichée depuis `items` à
+  // chaque rendu : un ajout/suppression via revalidate est pris en compte sans
+  // resynchroniser d'état (les nouveaux items sont ajoutés à la fin).
+  const [orderIds, setOrderIds] = useState<string[] | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [, startSave] = useTransition();
+
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const order = orderIds
+    ? [
+        ...orderIds.filter((id) => byId.has(id)).map((id) => byId.get(id)!),
+        ...items.filter((i) => !orderIds.includes(i.id)),
+      ]
+    : items;
+
+  function onDrop(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const from = order.findIndex((i) => i.id === dragId);
+    const to = order.findIndex((i) => i.id === targetId);
+    if (from === -1 || to === -1) return;
+    const next = [...order];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setOrderIds(next.map((i) => i.id));
+    setDragId(null);
+    startSave(async () => reorderImages(next.map((i) => i.id)));
+  }
+
+  if (order.length === 0) {
+    return (
+      <p className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground">
+        Aucune image. Ajoute-en une ou importe un egg.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {!reorderable && (
+        <p className="text-xs text-muted-foreground">
+          Efface la recherche pour réordonner par glisser-déposer.
+        </p>
+      )}
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {order.map((item) => (
+          <ImageRow
+            key={item.id}
+            item={item}
+            categories={categories}
+            drag={
+              reorderable
+                ? {
+                    dragging: dragId === item.id,
+                    onDragStart: () => setDragId(item.id),
+                    onDragEnd: () => setDragId(null),
+                    onDrop: () => onDrop(item.id),
+                  }
+                : undefined
+            }
+          />
+        ))}
+      </ul>
     </div>
   );
 }

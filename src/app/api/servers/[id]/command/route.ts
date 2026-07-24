@@ -5,6 +5,7 @@ import { z } from "zod";
 import { sessionUser } from "@/lib/auth/user";
 import { getKubeConfig } from "@/lib/k8s/client";
 import { requireServerPermission } from "@/lib/servers/authz";
+import { logActivity } from "@/lib/servers/activity";
 import { SERVERS_NAMESPACE } from "@/lib/servers/k8s";
 
 const bodySchema = z.object({
@@ -59,6 +60,12 @@ export async function POST(
     await new Promise((resolve) => setTimeout(resolve, 400));
     stdin.push(null);
     ws.close();
+    await logActivity({
+      serverId: server.id,
+      actor: user,
+      action: "console.command",
+      detail: `Commande : ${parsed.data.command}`,
+    });
   } catch {
     return NextResponse.json(
       { error: "Impossible d'atteindre la console (serveur arrêté ?)" },

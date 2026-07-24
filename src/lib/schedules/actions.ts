@@ -32,6 +32,7 @@ const scheduleSchema = z.object({
   name: z.string().trim().min(1, "Nom requis").max(96),
   cron: z.string().trim().min(1).max(128),
   enabled: z.coerce.boolean().default(true),
+  onlyWhenOnline: z.coerce.boolean().default(false),
   tasks: z.array(taskSchema).max(20),
 });
 
@@ -93,6 +94,7 @@ export async function saveScheduleAction(
           name: data.name,
           cron: data.cron,
           enabled: data.enabled,
+          onlyWhenOnline: data.onlyWhenOnline,
           updatedAt: new Date(),
         })
         .where(
@@ -110,6 +112,7 @@ export async function saveScheduleAction(
           name: data.name,
           cron: data.cron,
           enabled: data.enabled,
+          onlyWhenOnline: data.onlyWhenOnline,
         })
         .returning({ id: schema.schedules.id });
       sid = created.id;
