@@ -58,8 +58,16 @@ export async function setMinecraftProp(
     return { error: "Démarre le serveur au moins une fois pour créer ses fichiers." };
   }
 
+  // On n'édite QUE si l'on a pu lire le fichier existant : sinon on écraserait
+  // tout server.properties par une version à une seule clé (perte de données).
   const read = await agentFetch("/files/read", vol, PROPS_FILE);
-  const current = read.ok ? await read.text() : "";
+  if (!read.ok) {
+    return {
+      error:
+        "server.properties introuvable ou illisible. Démarre le serveur une fois pour qu'il génère le fichier, puis réessaie.",
+    };
+  }
+  const current = await read.text();
   const updated = setProperty(current, key, value);
 
   const write = await agentFetch("/files/write", vol, PROPS_FILE, {

@@ -44,13 +44,10 @@ const PROPS: { key: PropKey; label: string; icon: ComponentType<{ className?: st
 export function MinecraftPanel({
   serverId,
   initial,
-  exists,
   canEdit,
 }: {
   serverId: string;
   initial: Record<string, boolean>;
-  /** server.properties existe déjà (serveur démarré au moins une fois). */
-  exists: boolean;
   canEdit: boolean;
 }) {
   const [values, setValues] = useState<Record<string, boolean>>(initial);
@@ -78,9 +75,7 @@ export function MinecraftPanel({
           Autres propriétés
         </h2>
         <p className="text-[11px] text-muted-foreground">
-          {exists
-            ? "Prend effet au prochain redémarrage."
-            : "Valeurs par défaut — le fichier sera créé au 1er démarrage."}
+          Prend effet au prochain redémarrage.
         </p>
       </div>
 

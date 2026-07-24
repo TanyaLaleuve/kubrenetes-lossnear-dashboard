@@ -177,13 +177,22 @@ export default async function ServerDetailPage({
         </Info>
       </section>
 
-      {server.isMinecraft && mcProps && !("error" in mcProps) && (
+      {/* Panneau affiché seulement quand server.properties existe déjà (après
+          un 1er démarrage) : éditer un fichier absent le corromprait. */}
+      {server.isMinecraft && mcProps && !("error" in mcProps) && mcProps.exists && (
         <MinecraftPanel
           serverId={server.id}
           initial={mcProps.values}
-          exists={mcProps.exists}
           canEdit={can("files.write")}
         />
+      )}
+
+      {server.isMinecraft && mcProps && !("error" in mcProps) && !mcProps.exists && (
+        <p className="rounded-xl border border-border bg-card p-4 text-xs text-muted-foreground">
+          Démarre le serveur une première fois : il générera{" "}
+          <code className="font-mono">server.properties</code>, puis les
+          propriétés Minecraft apparaîtront ici.
+        </p>
       )}
 
       {Object.keys(server.env).length > 0 && (
