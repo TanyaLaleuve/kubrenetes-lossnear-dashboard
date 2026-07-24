@@ -80,21 +80,25 @@ export async function GET(
         new Promise((resolve) => setTimeout(resolve, ms));
 
       const seenEvents = new Set<string>();
+      // Kubernetes conserve les événements ~1 h : à l'ouverture du flux on
+      // ignore tout ce qui précède, sinon on redéverse l'historique des
+      // démarrages précédents à chaque (re)connexion.
+      const streamStart = Date.now();
       const emitPodEvents = async () => {
         try {
           const events = await core.listNamespacedEvent({
             namespace: SERVERS_NAMESPACE,
             fieldSelector: `involvedObject.name=${podName}`,
           });
-          const sorted = events.items.sort((a, b) => {
-            const ta = (a.lastTimestamp ?? a.eventTime ?? 0).valueOf();
-            const tb = (b.lastTimestamp ?? b.eventTime ?? 0).valueOf();
-            return ta > tb ? 1 : -1;
-          });
+          const evTime = (e: (typeof events.items)[number]) =>
+            (e.lastTimestamp ?? e.eventTime ?? 0).valueOf();
+          const sorted = events.items.sort((a, b) => (evTime(a) > evTime(b) ? 1 : -1));
           for (const event of sorted) {
             const key = `${event.metadata.uid}:${event.count ?? 0}`;
             if (seenEvents.has(key)) continue;
             seenEvents.add(key);
+            // Antérieur à l'ouverture du flux : marqué vu mais pas affiché.
+            if (evTime(event) < streamStart) continue;
             send(`[système] ${event.reason} — ${event.message ?? ""}`);
           }
         } catch {
