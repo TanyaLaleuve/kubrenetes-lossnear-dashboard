@@ -15,6 +15,15 @@ const schema = z.object({
     .string()
     .default("http://lossnear-agent.lossnear-system.svc.cluster.local:8080"),
   AGENT_TOKEN: z.string().default(""),
+  // Dashboard bot Discord (OAuth + API). Optionnels : la connexion Discord est
+  // simplement indisponible tant qu'ils ne sont pas fournis.
+  DISCORD_CLIENT_ID: z.string().default(""),
+  DISCORD_CLIENT_SECRET: z.string().default(""),
+  DISCORD_BOT_TOKEN: z.string().default(""),
+  /** URL de callback OAuth (doit être autorisée dans le portail Discord). */
+  DISCORD_REDIRECT_URI: z
+    .string()
+    .default("https://dashboard.lossnear.com/api/auth/discord/callback"),
 });
 
 let cached: z.infer<typeof schema> | null = null;
@@ -28,6 +37,10 @@ export function env() {
       ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH,
       AGENT_URL: process.env.AGENT_URL,
       AGENT_TOKEN: process.env.AGENT_TOKEN,
+      DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
+      DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
+      DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+      DISCORD_REDIRECT_URI: process.env.DISCORD_REDIRECT_URI,
     });
   }
   return cached;

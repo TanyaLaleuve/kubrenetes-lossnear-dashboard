@@ -17,7 +17,6 @@ import {
   Server,
   SquareStack,
   Egg,
-  MessageSquare,
   User,
   Users,
   X,
@@ -51,7 +50,6 @@ const ADMIN: Item[] = [
   { href: "/admin/users", label: "Utilisateurs", icon: Users },
   { href: "/eggs", label: "Templates (eggs)", icon: Egg },
   { href: "/images", label: "Images Docker", icon: Package },
-  { href: "/message-builder", label: "Message builder", icon: MessageSquare },
   { href: "/admin/backups", label: "Sauvegardes", icon: Package },
   { href: "/admin/apparence", label: "Apparence", icon: Palette },
 ];

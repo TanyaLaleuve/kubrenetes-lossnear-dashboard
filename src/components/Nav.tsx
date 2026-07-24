@@ -10,7 +10,6 @@ import {
   Gamepad2,
   Layers,
   LayoutDashboard,
-  MessageSquare,
   Package,
   Palette,
   Server,
@@ -124,12 +123,6 @@ export function Nav({ user }: { user: NavUser }) {
                 label="Images Docker"
                 icon={Package}
                 active={isActive(pathname, "/images")}
-              />
-              <SidebarLink
-                href="/message-builder"
-                label="Message builder"
-                icon={MessageSquare}
-                active={isActive(pathname, "/message-builder")}
               />
               <SidebarLink
                 href="/admin/backups"

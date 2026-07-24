@@ -7,6 +7,8 @@ import { env } from "@/lib/env";
 export type SessionData = {
   userId?: string;
   loggedIn: boolean;
+  /** Anti-CSRF OAuth Discord : valeur aléatoire posée avant la redirection. */
+  oauthState?: string;
 };
 
 const defaultSession: SessionData = { loggedIn: false };
