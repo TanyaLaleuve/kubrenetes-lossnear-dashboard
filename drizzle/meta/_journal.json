@@ -141,6 +141,13 @@
       "when": 1784894329326,
       "tag": "0019_backups",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784896133437,
+      "tag": "0020_mcp_tokens",
+      "breakpoints": true
     }
   ]
 }

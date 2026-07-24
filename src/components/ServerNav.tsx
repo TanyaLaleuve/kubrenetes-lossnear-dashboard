@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Rocket,
   Settings,
+  Sparkles,
   Terminal,
   Users,
 } from "lucide-react";
@@ -16,6 +17,7 @@ export type ServerNavTabs = {
   members: boolean;
   startup: boolean;
   backups: boolean;
+  ai: boolean;
   settings: boolean;
 };
 
@@ -65,6 +67,13 @@ export function ServerNav({
       label: "Sauvegardes",
       icon: Archive,
       show: tabs.backups,
+    },
+    {
+      href: `${base}/ai`,
+      exact: false,
+      label: "IA",
+      icon: Sparkles,
+      show: tabs.ai,
     },
   ].filter((item) => item.show);
 

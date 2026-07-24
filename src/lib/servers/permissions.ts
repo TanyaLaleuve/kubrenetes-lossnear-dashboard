@@ -67,6 +67,16 @@ export const PERMISSION_GROUPS = [
       { key: "backups.delete", label: "Supprimer une sauvegarde" },
     ],
   },
+  {
+    key: "ai",
+    label: "Assistant IA",
+    perms: [
+      {
+        key: "ai.use",
+        label: "Piloter ce serveur avec une IA (Claude, Codex, Gemini)",
+      },
+    ],
+  },
 ] as const;
 
 export const ALL_PERMISSIONS: Permission[] = PERMISSION_GROUPS.flatMap((g) =>

@@ -24,6 +24,10 @@ rules:
   - apiGroups: [""]
     resources: ["pods/attach"]
     verbs: ["get", "create"]
+  # pods/exec : shell IA dans le conteneur du serveur (outil MCP run_shell).
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["get", "create"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "update", "patch"]

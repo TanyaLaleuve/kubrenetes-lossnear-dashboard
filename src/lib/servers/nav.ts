@@ -24,6 +24,7 @@ export function serverNavProps(access: ServerAccess): {
       members: permissions.has("members.read"),
       startup: privileged || permissions.has("settings.egg"),
       backups: permissions.has("backups.read"),
+      ai: permissions.has("ai.use"),
       settings: canGeneral || canManage,
     },
     // Premier onglet réellement accessible, pour ne pas atterrir sur Général

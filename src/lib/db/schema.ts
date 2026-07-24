@@ -314,6 +314,30 @@ export const backups = pgTable("backups", {
 
 export type Backup = typeof backups.$inferSelect;
 
+/**
+ * Jetons personnels d'accès MCP : permettent à l'IA d'un utilisateur (Claude
+ * Code / Codex / Gemini, sur SA machine) de piloter ses serveurs via le pont
+ * MCP. Le jeton est lié à un compte ; chaque appel d'outil repasse par les
+ * permissions serveur de ce compte, donc l'IA ne peut jamais les dépasser.
+ * Seul le hash est stocké : la valeur en clair n'est montrée qu'à la création.
+ */
+export const mcpTokens = pgTable("mcp_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** Hash SHA-256 du jeton (jamais la valeur en clair). */
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  /** Préfixe lisible affiché dans la liste (ex. "lsk_ab12…"). */
+  prefix: varchar("prefix", { length: 16 }).notNull(),
+  label: varchar("label", { length: 64 }),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type McpToken = typeof mcpTokens.$inferSelect;
+
 export const priceInterval = pgEnum("price_interval", ["hour", "month", "year"]);
 
 /**

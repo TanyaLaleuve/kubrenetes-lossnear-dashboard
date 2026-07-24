@@ -26,11 +26,8 @@ export type SafeUser = {
   updatedAt: number;
 };
 
-/** Utilisateur connecté ou null (usage API routes). */
-export async function sessionUser(): Promise<SafeUser | null> {
-  const session = await getSession();
-  if (!session.loggedIn || !session.userId) return null;
-
+/** Charge un utilisateur par son id sous forme SafeUser, ou null. */
+export async function loadSafeUser(userId: string): Promise<SafeUser | null> {
   const rows = await db()
     .select({
       id: schema.users.id,
@@ -50,7 +47,7 @@ export async function sessionUser(): Promise<SafeUser | null> {
       updatedAt: schema.users.updatedAt,
     })
     .from(schema.users)
-    .where(eq(schema.users.id, session.userId))
+    .where(eq(schema.users.id, userId))
     .limit(1);
 
   const user = rows[0];
@@ -72,6 +69,13 @@ export async function sessionUser(): Promise<SafeUser | null> {
     portAllowlist: user.portAllowlist,
     updatedAt: user.updatedAt.valueOf(),
   };
+}
+
+/** Utilisateur connecté ou null (usage API routes). */
+export async function sessionUser(): Promise<SafeUser | null> {
+  const session = await getSession();
+  if (!session.loggedIn || !session.userId) return null;
+  return loadSafeUser(session.userId);
 }
 
 /** Utilisateur connecté (pages). Redirige vers /login si session invalide. */
