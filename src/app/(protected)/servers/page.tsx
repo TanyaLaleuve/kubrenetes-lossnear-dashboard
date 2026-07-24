@@ -8,7 +8,7 @@ import { requireView } from "@/lib/auth/user";
 import { canViewAllServers } from "@/lib/auth/dashboard-permissions";
 import { db, schema } from "@/lib/db";
 import { serverAddress } from "@/lib/servers/address";
-import { serverRuntimeStatus } from "@/lib/servers/k8s";
+import { serverRuntimeStatus, type ServerRuntimeStatus } from "@/lib/servers/k8s";
 import { formatAge } from "@/lib/k8s/format";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,16 @@ const SORTS = [
   { key: "status", label: "Statut" },
 ] as const;
 
-const STATUS_ORDER = { Running: 0, Starting: 1, Stopping: 2, Error: 3, Stopped: 4 };
+/** Ordre de tri par statut : les états qui demandent une action d'abord. */
+const STATUS_ORDER: Record<ServerRuntimeStatus["label"], number> = {
+  Running: 0,
+  Installation: 1,
+  Starting: 2,
+  Stopping: 3,
+  "Install échouée": 4,
+  Error: 5,
+  Stopped: 6,
+};
 
 export default async function ServersPage({
   searchParams,

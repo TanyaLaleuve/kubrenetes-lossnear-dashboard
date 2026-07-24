@@ -102,8 +102,8 @@ export async function GET(
         }
       };
 
-      /** Suit les logs jusqu'à coupure du flux. */
-      const streamLogs = () =>
+      /** Suit les logs d'un conteneur jusqu'à coupure du flux. */
+      const streamLogs = (container: string, prefix = "") =>
         new Promise<void>((resolve) => {
           const source = new PassThrough();
           let buffer = "";
@@ -111,13 +111,13 @@ export async function GET(
             buffer += chunk.toString("utf8");
             const lines = buffer.split("\n");
             buffer = lines.pop() ?? "";
-            for (const line of lines) send(sanitizeLog(line));
+            for (const line of lines) send(prefix + sanitizeLog(line));
           });
           const done = () => resolve();
           source.on("end", done);
           source.on("error", done);
           logClient
-            .log(SERVERS_NAMESPACE, podName, "server", source, {
+            .log(SERVERS_NAMESPACE, podName, container, source, {
               follow: true,
               tailLines: 150,
               timestamps: false,
@@ -128,7 +128,29 @@ export async function GET(
             .catch(done);
         });
 
+      /** Vide d'un coup les logs d'un conteneur (post-mortem d'un échec). */
+      const dumpLogs = async (container: string, prefix = "") => {
+        try {
+          const raw = await core.readNamespacedPodLog({
+            namespace: SERVERS_NAMESPACE,
+            name: podName,
+            container,
+            tailLines: 60,
+          });
+          for (const line of String(raw).split("\n")) {
+            if (line.trim()) send(prefix + sanitizeLog(line));
+          }
+        } catch {
+          send("[système] Logs d'installation indisponibles.");
+        }
+      };
+
       let waitingNotified = false;
+      // Tentative d'installation déjà rapportée (indexée sur le restartCount) :
+      // évite de reverser les mêmes logs à chaque tour de boucle.
+      let installReported = -1;
+      let installFollowed = -1;
+
       while (!closed) {
         let pod = null;
         try {
@@ -152,10 +174,45 @@ export async function GET(
 
         await emitPodEvents();
 
+        // Phase d'installation (initContainer) : c'est là que se jouent les
+        // téléchargements de l'egg. Sans ça, un échec n'apparaît que sous la
+        // forme d'un « BackOff » opaque dans les événements Kubernetes.
+        const install = pod.status?.initContainerStatuses?.find(
+          (s) => s.name === "install",
+        );
+        if (install) {
+          const attempt = install.restartCount ?? 0;
+          const ended = install.state?.terminated ?? install.lastState?.terminated;
+
+          if (install.state?.running) {
+            if (installFollowed !== attempt) {
+              installFollowed = attempt;
+              send("[système] Installation en cours…");
+            }
+            // Suit l'install en direct : se termine quand le conteneur s'arrête.
+            await streamLogs("install", "[install] ");
+            activeLogAbort = null;
+          } else if (ended && ended.exitCode !== 0 && installReported !== attempt) {
+            installReported = attempt;
+            send(
+              `[système] ÉCHEC de l'installation (code ${ended.exitCode}${
+                ended.reason ? `, ${ended.reason}` : ""
+              }). Détail :`,
+            );
+            await dumpLogs("install", "[install] ");
+            send(
+              "[système] Le serveur ne démarrera pas tant que l'installation échoue. Corrige la configuration dans l'onglet Startup, enregistre, puis relance.",
+            );
+          } else if (ended && ended.exitCode === 0 && installReported !== attempt) {
+            installReported = attempt;
+            send("[système] Installation terminée.");
+          }
+        }
+
         const state = pod.status?.containerStatuses?.[0]?.state;
         if (state?.running) {
           send(SEPARATOR);
-          await streamLogs();
+          await streamLogs("server");
           activeLogAbort = null;
           if (!closed) {
             send("[système] Flux de logs interrompu, reconnexion…");

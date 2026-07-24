@@ -361,7 +361,14 @@ export async function destroyServer(server: Server): Promise<void> {
 }
 
 export type ServerRuntimeStatus = {
-  label: "Running" | "Starting" | "Stopped" | "Stopping" | "Error";
+  label:
+    | "Running"
+    | "Starting"
+    | "Stopped"
+    | "Stopping"
+    | "Error"
+    | "Installation"
+    | "Install échouée";
   tone: "ok" | "pending" | "muted" | "error";
   pod?: V1Pod;
 };
@@ -384,6 +391,21 @@ export async function serverRuntimeStatus(
   if (pod.metadata?.deletionTimestamp) {
     return { label: "Stopping", tone: "pending", pod };
   }
+  // Installation (initContainer) : distinguée du reste, sinon un script d'egg
+  // qui échoue n'apparaît que comme « Starting » sans fin ou « Error » opaque.
+  const install = pod.status?.initContainerStatuses?.find(
+    (s) => s.name === "install",
+  );
+  if (install && !install.ready) {
+    const ended = install.state?.terminated ?? install.lastState?.terminated;
+    if (ended && ended.exitCode !== 0) {
+      return { label: "Install échouée", tone: "error", pod };
+    }
+    if (install.state?.running || install.state?.waiting) {
+      return { label: "Installation", tone: "pending", pod };
+    }
+  }
+
   const waiting = pod.status?.containerStatuses?.[0]?.state?.waiting?.reason;
   if (waiting && waiting !== "ContainerCreating" && waiting !== "PodInitializing") {
     return { label: "Error", tone: "error", pod };
