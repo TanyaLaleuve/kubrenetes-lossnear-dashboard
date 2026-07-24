@@ -1,7 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useTransition } from "react";
-import { UserCog, Trash2, UserPlus } from "lucide-react";
+import {
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { ChevronRight, UserCog, Trash2, UserPlus } from "lucide-react";
 import { Avatar } from "@/components/Avatar";
 import {
   addMember,
@@ -140,9 +146,13 @@ function CreateSubUserForm({ serverId }: { serverId: string }) {
 function MemberCard({
   serverId,
   member,
+  open,
+  onToggle,
 }: {
   serverId: string;
   member: Member;
+  open: boolean;
+  onToggle: () => void;
 }) {
   const [state, action, pending] = useActionState(
     updateMemberPermissions,
@@ -152,17 +162,33 @@ function MemberCard({
   const granted = new Set(member.permissions);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex items-center gap-3">
-        <Avatar
-          userId={member.userId}
-          username={member.username}
-          hasAvatar={member.hasAvatar}
-          size={36}
-        />
-        <p className="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
-          {member.username}
-        </p>
+    <div className="rounded-xl border border-border bg-card">
+      {/* Ligne fine cliquable : on déplie les permissions à la demande. */}
+      <div className="flex items-center gap-2 p-2.5">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left"
+        >
+          <ChevronRight
+            className={`size-4 shrink-0 text-muted-foreground transition-transform duration-150 ${open ? "rotate-90" : ""}`}
+            aria-hidden
+          />
+          <Avatar
+            userId={member.userId}
+            username={member.username}
+            hasAvatar={member.hasAvatar}
+            size={28}
+          />
+          <span className="min-w-0 flex-1 truncate font-mono text-sm font-semibold">
+            {member.username}
+          </span>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {member.permissions.length} perm
+            {member.permissions.length > 1 ? "s" : ""}
+          </span>
+        </button>
         <button
           type="button"
           onClick={() =>
@@ -170,13 +196,14 @@ function MemberCard({
           }
           disabled={removing}
           aria-label={`Retirer ${member.username}`}
-          className="grid size-8 cursor-pointer place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:border-destructive/50 hover:text-destructive disabled:opacity-50"
+          className="grid size-8 shrink-0 cursor-pointer place-items-center rounded-lg border border-border text-muted-foreground transition-colors duration-150 hover:border-destructive/50 hover:text-destructive disabled:opacity-50"
         >
           <Trash2 className="size-3.5" aria-hidden />
         </button>
       </div>
 
-      <form action={action} className="mt-3">
+      {open && (
+      <form action={action} className="border-t border-border p-3">
         <input type="hidden" name="serverId" value={serverId} />
         <input type="hidden" name="memberId" value={member.userId} />
         <div className="grid gap-3 sm:grid-cols-2">
@@ -221,6 +248,7 @@ function MemberCard({
           )}
         </div>
       </form>
+      )}
     </div>
   );
 }
@@ -234,6 +262,21 @@ export function MemberManager({
   members: Member[];
   canManage: boolean;
 }) {
+  // Un seul membre déplié à la fois (accordéon), replié par défaut.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const prevIds = useRef<Set<string> | null>(null);
+
+  // Un membre qui vient d'apparaître (invitation ou sous-compte créé) est
+  // déplié automatiquement.
+  useEffect(() => {
+    const ids = new Set(members.map((m) => m.userId));
+    if (prevIds.current) {
+      const added = [...ids].find((id) => !prevIds.current!.has(id));
+      if (added) setOpenId(added);
+    }
+    prevIds.current = ids;
+  }, [members]);
+
   return (
     <div className="space-y-4">
       {canManage && (
@@ -248,9 +291,19 @@ export function MemberManager({
           Aucun membre invité. Le propriétaire a déjà tous les droits.
         </p>
       ) : canManage ? (
-        members.map((member) => (
-          <MemberCard key={member.userId} serverId={serverId} member={member} />
-        ))
+        <div className="space-y-2">
+          {members.map((member) => (
+            <MemberCard
+              key={member.userId}
+              serverId={serverId}
+              member={member}
+              open={openId === member.userId}
+              onToggle={() =>
+                setOpenId((cur) => (cur === member.userId ? null : member.userId))
+              }
+            />
+          ))}
+        </div>
       ) : (
         <ul className="space-y-2">
           {members.map((member) => (

@@ -32,6 +32,31 @@ export default async function NodesPage() {
   ]);
   const metaByNode = new Map(metaRows.map((m) => [m.nodeName, m]));
 
+  // Récapitulatif du cluster : capacités cumulées et coût normalisé.
+  let totalCpu = 0;
+  let totalMemory = 0;
+  let totalDisk = 0;
+  let monthlyCents = 0;
+  let currency = "EUR";
+  for (const node of nodes) {
+    totalCpu += parseCpu(node.status?.capacity?.cpu ?? "0");
+    totalMemory += parseMemory(node.status?.capacity?.memory ?? "0");
+    totalDisk += parseMemory(node.status?.capacity?.["ephemeral-storage"] ?? "0");
+    const meta = metaByNode.get(node.metadata?.name ?? "");
+    if (meta?.priceCents != null) {
+      currency = meta.priceCurrency || currency;
+      // Normalisation en coût mensuel (heure ≈ 730 h/mois, an = /12).
+      const perMonth =
+        meta.priceInterval === "hour"
+          ? meta.priceCents * 730
+          : meta.priceInterval === "year"
+            ? meta.priceCents / 12
+            : meta.priceCents;
+      monthlyCents += perMonth;
+    }
+  }
+  const money = (cents: number) => `${(cents / 100).toFixed(2)} ${currency}`;
+
   return (
     <div className="space-y-6">
       <AutoRefresh seconds={15} />
@@ -41,6 +66,25 @@ export default async function NodesPage() {
           {nodes.length} nœud{nodes.length > 1 ? "s" : ""} dans le cluster
         </p>
       </header>
+
+      {/* Récapitulatif cumulé du cluster. */}
+      <section
+        aria-label="Récapitulatif du cluster"
+        className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-3 lg:grid-cols-6"
+      >
+        <Recap label="Nœuds" value={String(nodes.length)} />
+        <Recap label="CPU total" value={`${formatCpu(totalCpu)} cœurs`} />
+        <Recap label="RAM totale" value={formatBytes(totalMemory)} />
+        <Recap label="Stockage total" value={formatBytes(totalDisk)} />
+        <Recap
+          label="Coût / mois"
+          value={monthlyCents > 0 ? money(monthlyCents) : "—"}
+        />
+        <Recap
+          label="Coût / an"
+          value={monthlyCents > 0 ? money(monthlyCents * 12) : "—"}
+        />
+      </section>
 
       {user.isAdmin && (
         <details className="rounded-xl border border-border bg-card">
@@ -200,6 +244,17 @@ function Info({ label, children }: { label: string; children: React.ReactNode })
     <div>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 truncate font-mono text-sm">{children}</dd>
+    </div>
+  );
+}
+
+function Recap({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-0.5 truncate font-mono text-sm font-semibold">{value}</p>
     </div>
   );
 }

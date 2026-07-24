@@ -10,10 +10,13 @@ export function ServerEggForm({
   server,
   egg,
   canEdit,
+  canEditStartupCommand = false,
 }: {
   server: ServerType;
   egg: EggType | null;
   canEdit: boolean;
+  /** Permission settings.startup_command : éditer la ligne de démarrage brute. */
+  canEditStartupCommand?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<ServerFormState, FormData>(
     updateServerEggSettings,
@@ -99,25 +102,51 @@ export function ServerEggForm({
         )}
       </div>
 
-      {/* Ligne de démarrage : aperçu seul, modifiable depuis Paramètres. */}
+      {/* Ligne de démarrage : éditable avec la permission dédiée, sinon aperçu. */}
       <div className="space-y-2">
-        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <label
+          htmlFor="startup"
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+        >
           <Terminal className="size-3.5" /> Ligne de démarrage
-        </span>
-        <div className="space-y-1 rounded-lg border border-border/60 bg-background/50 p-3">
-          <p className="font-mono text-xs break-all text-accent">
-            {startupPreview || "(aucune)"}
-          </p>
-          {startup && startup !== startupPreview && (
-            <p className="font-mono text-[11px] break-all text-muted-foreground">
-              modèle : {startup}
+        </label>
+        {canEditStartupCommand ? (
+          <>
+            <textarea
+              id="startup"
+              name="startup"
+              rows={2}
+              defaultValue={startup}
+              disabled={!canEdit}
+              data-keep-empty
+              placeholder="java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar {{SERVER_JARFILE}}"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Exécutée via <code className="font-mono">sh -c</code>. Utilise{" "}
+              <code className="font-mono">{"{{VARIABLE}}"}</code> pour insérer une
+              variable. Aperçu :{" "}
+              <span className="font-mono text-accent">{startupPreview || "(aucune)"}</span>
             </p>
-          )}
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          Générée à partir des variables ci-dessous. Modifiable uniquement
-          depuis Paramètres, avec la permission dédiée.
-        </p>
+          </>
+        ) : (
+          <>
+            <div className="space-y-1 rounded-lg border border-border/60 bg-background/50 p-3">
+              <p className="font-mono text-xs break-all text-accent">
+                {startupPreview || "(aucune)"}
+              </p>
+              {startup && startup !== startupPreview && (
+                <p className="font-mono text-[11px] break-all text-muted-foreground">
+                  modèle : {startup}
+                </p>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Générée à partir des variables ci-dessous. Sa modification demande
+              une permission dédiée.
+            </p>
+          </>
+        )}
       </div>
 
       {/* Variables de l'Egg */}

@@ -44,7 +44,14 @@ export default async function ServerStartupPage({
 
       <ServerNav {...serverNavProps(access)} />
 
-      <ServerEggForm server={access.server} egg={egg} canEdit={canEdit} />
+      <ServerEggForm
+        server={access.server}
+        egg={egg}
+        canEdit={canEdit}
+        canEditStartupCommand={
+          access.privileged || access.permissions.has("settings.startup_command")
+        }
+      />
     </div>
   );
 }

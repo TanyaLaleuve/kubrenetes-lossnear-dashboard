@@ -26,6 +26,9 @@ export function ServerConsole({
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  // Vrai pendant un défilement provoqué par nous : évite que l'événement scroll
+  // qui en découle ne débraye le suivi (cas des gros lots de lignes d'un coup).
+  const programmatic = useRef(false);
 
   useEffect(() => {
     if (!running) return;
@@ -56,12 +59,20 @@ export function ServerConsole({
     // Après le paint (le contenu ajouté est mis en page) : colle au bas.
     const id = requestAnimationFrame(() => {
       const el = scrollRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (!el) return;
+      programmatic.current = true;
+      el.scrollTop = el.scrollHeight;
+      // L'événement scroll qui suit ne doit pas être pris pour un geste manuel.
+      requestAnimationFrame(() => {
+        programmatic.current = false;
+      });
     });
     return () => cancelAnimationFrame(id);
   }, [lines]);
 
   function onScroll() {
+    // Ignore les défilements que nous provoquons (sinon un gros lot débraye).
+    if (programmatic.current) return;
     const el = scrollRef.current;
     if (!el) return;
     // Marge généreuse : tant qu'on est proche du bas, on considère « collé ».

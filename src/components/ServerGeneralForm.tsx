@@ -8,7 +8,6 @@ import {
   MemoryStick,
   Save,
   Server,
-  Terminal,
   User,
 } from "lucide-react";
 import { PortCheck } from "@/components/PortCheck";
@@ -28,15 +27,12 @@ export function ServerGeneralForm({
   ownerUsername,
   canEdit,
   isPrivileged,
-  canEditStartupCommand,
   canChoosePort,
   portMin,
   portMax,
   portsLabel,
 }: {
   server: ServerType;
-  /** Permission dédiée : modifier la ligne de démarrage brute. */
-  canEditStartupCommand: boolean;
   /** Liste complète des comptes — vide si !isPrivileged (pas envoyée au client). */
   users: UserItem[];
   /** Nom du propriétaire actuel, pour l'affichage en lecture seule. */
@@ -237,33 +233,6 @@ export function ServerGeneralForm({
           />
           <p className="text-[11px] text-muted-foreground">Port interne (Minecraft = 25565)</p>
         </div>
-
-        {/* Ligne de démarrage (permission dédiée) */}
-        {canEditStartupCommand && (
-          <div className="space-y-2 sm:col-span-2">
-            <label
-              htmlFor="startup"
-              className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-            >
-              <Terminal className="size-3.5" /> Ligne de démarrage
-            </label>
-            <textarea
-              id="startup"
-              name="startup"
-              rows={2}
-              defaultValue={server.startup ?? ""}
-              disabled={!canEdit}
-              placeholder="java -Xms128M -Xmx{{SERVER_MEMORY}}M -jar {{SERVER_JARFILE}}"
-              data-keep-empty
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus:border-accent focus:outline-none disabled:opacity-50"
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Exécutée via <code className="font-mono">sh -c</code>. Utilise{" "}
-              <code className="font-mono">{"{{VARIABLE}}"}</code> pour insérer
-              une variable. Vide = comportement par défaut de l&apos;image.
-            </p>
-          </div>
-        )}
 
         {/* Nom de domaine + affichage du port */}
         <div className="space-y-3 sm:col-span-2">

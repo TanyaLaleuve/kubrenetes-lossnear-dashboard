@@ -677,11 +677,8 @@ export async function updateServerGeneralSettings(
     memoryMi: input.memoryMi,
     displayAddress: input.displayAddress || null,
     showPort: input.showPort,
-    // Ligne de démarrage : uniquement avec la permission dédiée (le champ
-    // n'est pas rendu sinon, mais on revalide côté serveur).
-    ...(access.privileged || access.permissions.has("settings.startup_command")
-      ? { startup: String(formData.get("startup") ?? "").trim() || null }
-      : {}),
+    // Ligne de démarrage : déplacée dans l'onglet Startup (settings.egg +
+    // permission settings.startup_command).
     updatedAt: new Date(),
   };
 
@@ -719,13 +716,19 @@ export async function updateServerEggSettings(
 ): Promise<ServerFormState> {
   const user = await currentUser();
   const serverId = String(formData.get("serverId") ?? "");
-  const server = await requireServerPermission(user, serverId, "settings.egg");
+  const access = await serverAccess(user, serverId);
+  if (!access || !access.permissions.has("settings.egg")) {
+    return { error: "Accès refusé" };
+  }
+  const server = access.server;
 
-  // La ligne de démarrage n'est pas modifiable ici : elle se change depuis
-  // les paramètres généraux, avec la permission settings.startup_command.
   const image = String(formData.get("image") ?? "").trim();
-
   if (!image) return { error: "L'image Docker ne peut pas être vide." };
+
+  // Ligne de démarrage : modifiable ici seulement avec la permission dédiée
+  // (le champ n'est pas rendu sinon, mais on revérifie côté serveur).
+  const canStartup =
+    access.privileged || access.permissions.has("settings.startup_command");
 
   let currentEnv: Record<string, string> = { ...server.env };
 
@@ -756,6 +759,9 @@ export async function updateServerEggSettings(
     .set({
       image,
       env: currentEnv,
+      ...(canStartup
+        ? { startup: String(formData.get("startup") ?? "").trim() || null }
+        : {}),
       updatedAt: new Date(),
     })
     .where(eq(schema.servers.id, server.id))
