@@ -34,6 +34,12 @@ export function ServerConsole({
     source.onopen = () => setLines([]);
     source.onmessage = (event) => {
       const clean = (event.data as string).replace(ANSI_PATTERN, "");
+      // Début d'un run : on vide la console pour ne pas cumuler les logs (et les
+      // événements [système]) des démarrages précédents.
+      if (clean === "SERVER_LOGS") {
+        setLines([]);
+        return;
+      }
       setLines((prev) => {
         const next = [...prev, clean];
         return next.length > MAX_LINES ? next.slice(-MAX_LINES) : next;

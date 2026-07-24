@@ -150,6 +150,8 @@ export async function GET(
       // évite de reverser les mêmes logs à chaque tour de boucle.
       let installReported = -1;
       let installFollowed = -1;
+      // Séparateur « logs serveur » déjà envoyé pour le run en cours.
+      let separatorSent = false;
 
       while (!closed) {
         let pod = null;
@@ -211,12 +213,20 @@ export async function GET(
 
         const state = pod.status?.containerStatuses?.[0]?.state;
         if (state?.running) {
-          send(SEPARATOR);
+          // Séparateur envoyé une seule fois par run : le client vide la console
+          // à ce signal, pour ne pas cumuler les logs des démarrages précédents.
+          if (!separatorSent) {
+            send(SEPARATOR);
+            separatorSent = true;
+          }
           await streamLogs("server");
           activeLogAbort = null;
           if (!closed) {
             send("[système] Flux de logs interrompu, reconnexion…");
           }
+        } else {
+          // Conteneur pas (plus) en cours : le prochain démarrage videra à nouveau.
+          separatorSent = false;
         }
         await sleep(2000);
       }
