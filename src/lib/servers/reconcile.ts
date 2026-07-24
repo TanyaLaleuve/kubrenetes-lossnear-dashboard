@@ -4,7 +4,7 @@ import { db, schema } from "@/lib/db";
 import { coreApi } from "@/lib/k8s/client";
 import { diskUsage, quotaBytes } from "./disk";
 import { resolveVolumeDir } from "./files";
-import { applyServer, SERVERS_NAMESPACE } from "./k8s";
+import { applyServer, forceDeletePod, SERVERS_NAMESPACE } from "./k8s";
 
 // Anti crash-loop : si un serveur redémarre CRASH_THRESHOLD fois en moins de
 // WINDOW_MS, on le force à l'état "arrêté" au lieu de laisser Kubernetes le
@@ -124,7 +124,10 @@ async function tick() {
           .set({ desiredState: "stopped", updatedAt: new Date() })
           .where(eq(schema.servers.id, server.id))
           .returning();
-        if (updated) await applyServer(updated);
+        if (updated) await applyServer(updated); // scale à 0
+        // Supprime immédiatement le pod en CrashLoop : sinon il peut retenter
+        // un cycle pendant le délai de grâce du scale-à-0.
+        await forceDeletePod(server.slug).catch(() => {});
         streaks.delete(server.slug);
         console.warn(
           `[reconcile] ${server.slug} arrêté : ${restarts - prev.baseCount} crashs en moins de ${WINDOW_MS / 1000}s`,
