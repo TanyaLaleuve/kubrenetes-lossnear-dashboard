@@ -77,6 +77,14 @@ export const PERMISSION_GROUPS = [
       },
     ],
   },
+  {
+    key: "schedules",
+    label: "Planificateur",
+    perms: [
+      { key: "schedules.read", label: "Voir les tâches planifiées" },
+      { key: "schedules.manage", label: "Créer / modifier les tâches planifiées" },
+    ],
+  },
 ] as const;
 
 export const ALL_PERMISSIONS: Permission[] = PERMISSION_GROUPS.flatMap((g) =>

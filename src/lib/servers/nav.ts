@@ -25,6 +25,7 @@ export function serverNavProps(access: ServerAccess): {
       startup: privileged || permissions.has("settings.egg"),
       backups: permissions.has("backups.read"),
       ai: permissions.has("ai.use"),
+      schedules: permissions.has("schedules.read"),
       settings: canGeneral || canManage,
     },
     // Premier onglet réellement accessible, pour ne pas atterrir sur Général

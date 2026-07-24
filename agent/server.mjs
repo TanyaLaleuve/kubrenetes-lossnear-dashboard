@@ -388,6 +388,25 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // Téléchargement d'une URL directement dans le volume (tâche planifiée
+    // « mise à jour »). Marche même serveur éteint. URL http/https uniquement.
+    if (req.method === "POST" && route === "/files/fetch") {
+      const body = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+      const url = String(body.url || "");
+      if (!/^https?:\/\//i.test(url)) {
+        return json(res, 400, { error: "URL invalide (http/https attendu)" });
+      }
+      const upstream = await fetch(url, { redirect: "follow" });
+      if (!upstream.ok || !upstream.body) {
+        return json(res, 502, { error: `Téléchargement échoué (HTTP ${upstream.status})` });
+      }
+      await mkdir(dirname(target), { recursive: true });
+      const { Readable } = await import("node:stream");
+      await pipeline(Readable.fromWeb(upstream.body), createWriteStream(target));
+      const s = await stat(target);
+      return json(res, 200, { ok: true, size: s.size });
+    }
+
     // Création d'un backup : archive le volume `vol` (serveur arrêté en amont).
     if (req.method === "POST" && route === "/backup/create") {
       const slug = url.searchParams.get("slug") || "";

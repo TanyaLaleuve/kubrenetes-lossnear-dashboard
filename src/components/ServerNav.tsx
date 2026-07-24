@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Archive,
+  CalendarClock,
   FolderOpen,
   Rocket,
   Settings,
@@ -18,6 +19,7 @@ export type ServerNavTabs = {
   startup: boolean;
   backups: boolean;
   ai: boolean;
+  schedules: boolean;
   settings: boolean;
 };
 
@@ -74,6 +76,13 @@ export function ServerNav({
       label: "IA",
       icon: Sparkles,
       show: tabs.ai,
+    },
+    {
+      href: `${base}/schedules`,
+      exact: false,
+      label: "Planificateur",
+      icon: CalendarClock,
+      show: tabs.schedules,
     },
   ].filter((item) => item.show);
 

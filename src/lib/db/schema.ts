@@ -314,6 +314,75 @@ export const backups = pgTable("backups", {
 
 export type Backup = typeof backups.$inferSelect;
 
+/** Statut de la dernière exécution d'une tâche planifiée. */
+export const scheduleStatus = pgEnum("schedule_status", [
+  "ok",
+  "error",
+  "running",
+]);
+
+/**
+ * Tâche planifiée d'un serveur (façon Pterodactyl, en mieux) : une récurrence
+ * cron (évaluée en Europe/Paris) déclenche une liste d'actions en séquence.
+ */
+export const schedules = pgTable("schedules", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  serverId: uuid("server_id")
+    .notNull()
+    .references(() => servers.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 96 }).notNull(),
+  /** Expression cron 5 champs : min heure jour-mois mois jour-semaine. */
+  cron: varchar("cron", { length: 128 }).notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+  lastStatus: scheduleStatus("last_status"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type Schedule = typeof schedules.$inferSelect;
+
+/** Type d'une tâche planifiée. */
+export const scheduleTaskType = pgEnum("schedule_task_type", [
+  "power",
+  "command",
+  "backup",
+  "download",
+]);
+
+/**
+ * Action d'une tâche planifiée, exécutée dans l'ordre `position` avec un délai
+ * `delaySeconds` avant son lancement (offset façon Pterodactyl).
+ * `payload` selon le type : power {action}, command {command}, backup {note?},
+ * download {url, path}.
+ */
+export const scheduleTasks = pgTable("schedule_tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scheduleId: uuid("schedule_id")
+    .notNull()
+    .references(() => schedules.id, { onDelete: "cascade" }),
+  position: integer("position").notNull().default(0),
+  type: scheduleTaskType("type").notNull(),
+  payload: jsonb("payload").$type<Record<string, string>>().notNull().default({}),
+  delaySeconds: integer("delay_seconds").notNull().default(0),
+});
+
+export type ScheduleTask = typeof scheduleTasks.$inferSelect;
+
+/** Historique d'exécution d'une tâche planifiée (garde les récentes). */
+export const scheduleRuns = pgTable("schedule_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  scheduleId: uuid("schedule_id")
+    .notNull()
+    .references(() => schedules.id, { onDelete: "cascade" }),
+  status: scheduleStatus("status").notNull(),
+  /** Journal lisible (une ligne par tâche). */
+  detail: text("detail").notNull().default(""),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ScheduleRun = typeof scheduleRuns.$inferSelect;
+
 /**
  * Jetons personnels d'accès MCP : permettent à l'IA d'un utilisateur (Claude
  * Code / Codex / Gemini, sur SA machine) de piloter ses serveurs via le pont

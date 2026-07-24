@@ -6,10 +6,10 @@ import { db, schema } from "@/lib/db";
 import { currentUser } from "@/lib/auth/user";
 import { requireServerPermission, serverAccess } from "./authz";
 import {
-  agentCreateArchive,
   agentDeleteArchive,
   agentRestoreArchive,
   ownerAllocatedBackups,
+  performServerBackup,
   serverManualBackupCount,
 } from "./backups";
 import { setReplicas, waitPodGone } from "./k8s";
@@ -115,56 +115,13 @@ export async function createBackupAction(
   if (!(await ownerCanBackup(server.ownerId))) {
     return { error: "Les sauvegardes ne sont pas activées pour ce compte." };
   }
-  if (server.backupLimit <= 0) {
-    return { error: "Aucune sauvegarde allouée à ce serveur." };
-  }
-  const existing = await serverManualBackupCount(server.id);
-  if (existing >= server.backupLimit) {
-    return {
-      error: `Limite atteinte (${existing}/${server.backupLimit}). Supprime une sauvegarde avant d'en créer une nouvelle.`,
-    };
-  }
 
-  const wasRunning = server.desiredState === "running";
-
-  // Ligne « en cours » (taille 0) : trace la sauvegarde même si l'archive
-  // échoue à mi-chemin, pour ne pas laisser de fichier orphelin invisible.
-  const [row] = await db()
-    .insert(schema.backups)
-    .values({
-      serverId: server.id,
-      serverSlug: server.slug,
-      serverName: server.name,
-      ownerId: server.ownerId,
-      kind: "manual",
-      note,
-      createdBy: user.id,
-      sizeBytes: 0,
-    })
-    .returning({ id: schema.backups.id });
-
-  try {
-    // Arrêt propre pour une archive cohérente (choix utilisateur).
-    if (wasRunning) {
-      await setReplicas(server.slug, 0);
-      await waitPodGone(server.slug);
-    }
-    const size = await agentCreateArchive(server.slug, row.id);
-    await db()
-      .update(schema.backups)
-      .set({ sizeBytes: size })
-      .where(eq(schema.backups.id, row.id));
-  } catch (error) {
-    // Nettoyage : on retire la ligne et l'archive éventuelle.
-    await db().delete(schema.backups).where(eq(schema.backups.id, row.id));
-    await agentDeleteArchive(server.slug, row.id).catch(() => {});
-    if (wasRunning) await setReplicas(server.slug, 1).catch(() => {});
-    return {
-      error: error instanceof Error ? error.message : "Échec de la sauvegarde.",
-    };
-  }
-
-  if (wasRunning) await setReplicas(server.slug, 1).catch(() => {});
+  const result = await performServerBackup(server, {
+    createdBy: user.id,
+    note,
+    rotate: false,
+  });
+  if (result.error) return { error: result.error };
 
   revalidate(server.shortId, server.id);
   return { success: "Sauvegarde créée." };

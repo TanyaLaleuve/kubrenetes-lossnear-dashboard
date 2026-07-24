@@ -37,4 +37,8 @@ export async function register() {
   // Surveillance anti crash-loop des serveurs custom.
   const { startCrashLoopReconciler } = await import("@/lib/servers/reconcile");
   startCrashLoopReconciler();
+
+  // Planificateur (tâches cron des serveurs).
+  const { startScheduleRunner } = await import("@/lib/schedules/runner");
+  startScheduleRunner();
 }

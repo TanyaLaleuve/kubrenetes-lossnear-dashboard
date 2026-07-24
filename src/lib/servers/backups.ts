@@ -1,8 +1,10 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { env } from "@/lib/env";
+import type { Server } from "@/lib/db/schema";
 import { resolveVolumeDir } from "./files";
+import { setReplicas, waitPodGone } from "./k8s";
 
 /**
  * Appel à l'agent pour une opération de sauvegarde. Les backups sont des
@@ -67,6 +69,77 @@ export async function agentDeleteArchive(
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || "Échec de la suppression de l'archive.");
+  }
+}
+
+/**
+ * Cœur de la création d'une sauvegarde manuelle : arrêt propre du serveur,
+ * archive, redémarrage. Respecte le plafond du serveur ; `rotate` supprime la
+ * plus ancienne au lieu de refuser (utilisé par le planificateur pour qu'une
+ * sauvegarde quotidienne ne se bloque pas). Renvoie l'erreur en texte ou null.
+ */
+export async function performServerBackup(
+  server: Server,
+  opts: { createdBy: string | null; note: string | null; rotate?: boolean },
+): Promise<{ error: string | null; sizeBytes?: number }> {
+  if (server.backupLimit <= 0) return { error: "Aucune sauvegarde allouée." };
+
+  const existing = await serverManualBackupCount(server.id);
+  if (existing >= server.backupLimit) {
+    if (!opts.rotate) {
+      return {
+        error: `Limite atteinte (${existing}/${server.backupLimit}). Supprime une sauvegarde d'abord.`,
+      };
+    }
+    // Rotation : retire la ou les plus anciennes pour faire de la place.
+    const olds = await db()
+      .select({ id: schema.backups.id, slug: schema.backups.serverSlug })
+      .from(schema.backups)
+      .where(
+        and(eq(schema.backups.serverId, server.id), eq(schema.backups.kind, "manual")),
+      )
+      .orderBy(asc(schema.backups.createdAt))
+      .limit(existing - server.backupLimit + 1);
+    for (const old of olds) {
+      await agentDeleteArchive(old.slug, old.id).catch(() => {});
+      await db().delete(schema.backups).where(eq(schema.backups.id, old.id));
+    }
+  }
+
+  const [row] = await db()
+    .insert(schema.backups)
+    .values({
+      serverId: server.id,
+      serverSlug: server.slug,
+      serverName: server.name,
+      ownerId: server.ownerId,
+      kind: "manual",
+      note: opts.note,
+      createdBy: opts.createdBy,
+      sizeBytes: 0,
+    })
+    .returning({ id: schema.backups.id });
+
+  const wasRunning = server.desiredState === "running";
+  try {
+    if (wasRunning) {
+      await setReplicas(server.slug, 0);
+      await waitPodGone(server.slug);
+    }
+    const size = await agentCreateArchive(server.slug, row.id);
+    await db()
+      .update(schema.backups)
+      .set({ sizeBytes: size })
+      .where(eq(schema.backups.id, row.id));
+    if (wasRunning) await setReplicas(server.slug, 1).catch(() => {});
+    return { error: null, sizeBytes: size };
+  } catch (error) {
+    await db().delete(schema.backups).where(eq(schema.backups.id, row.id));
+    await agentDeleteArchive(server.slug, row.id).catch(() => {});
+    if (wasRunning) await setReplicas(server.slug, 1).catch(() => {});
+    return {
+      error: error instanceof Error ? error.message : "Échec de la sauvegarde.",
+    };
   }
 }
 
