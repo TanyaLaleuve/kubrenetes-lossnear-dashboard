@@ -11,6 +11,11 @@ import { z } from "zod";
 
 /** Répertoire de travail par défaut d'un serveur créé depuis un egg. */
 export const EGG_MOUNT_PATH = "/home/container";
+
+/** Un egg est-il « Minecraft » ? (catégorie contenant « minecraft »). */
+export function isMinecraftEgg(egg: { category: string | null }): boolean {
+  return !!egg.category && egg.category.toLowerCase().includes("minecraft");
+}
 /** Image d'installation par défaut si l'egg n'en précise pas. */
 export const DEFAULT_INSTALL_CONTAINER = "debian:bookworm-slim";
 export const DEFAULT_INSTALL_ENTRYPOINT = "bash";

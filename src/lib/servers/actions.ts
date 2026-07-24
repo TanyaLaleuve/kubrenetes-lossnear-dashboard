@@ -10,7 +10,7 @@ import { currentUser } from "@/lib/auth/user";
 import { requirePrivileged, requireServerPermission, serverAccess } from "./authz";
 import { DEFAULT_IMAGE } from "./constants";
 import { DEFAULT_MEMBER_PERMISSIONS, sanitizePermissions } from "./permissions";
-import { builtinVars, EGG_MOUNT_PATH, resolveEnv } from "./eggs";
+import { builtinVars, EGG_MOUNT_PATH, isMinecraftEgg, resolveEnv } from "./eggs";
 import {
   AUTO_PORT_MAX,
   AUTO_PORT_MIN,
@@ -374,6 +374,7 @@ export async function createServerFromEgg(
       installContainer: egg.installContainer,
       installEntrypoint: egg.installEntrypoint,
       mountPath: EGG_MOUNT_PATH,
+      isMinecraft: isMinecraftEgg(egg),
       desiredState: "stopped",
     })
     .returning();

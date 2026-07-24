@@ -6,6 +6,7 @@ import { ServerAddress } from "@/components/ServerAddress";
 import { ServerConsole } from "@/components/ServerConsole";
 import { ServerHeader } from "@/components/ServerHeader";
 import { ServerNav } from "@/components/ServerNav";
+import { MinecraftPanel } from "@/components/MinecraftPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import { currentUser } from "@/lib/auth/user";
 import {
@@ -19,6 +20,7 @@ import { serverNavProps } from "@/lib/servers/nav";
 import { serverAddress } from "@/lib/servers/address";
 import { diskUsage, quotaRatio, usageOf } from "@/lib/servers/disk";
 import { resolveVolumeDir } from "@/lib/servers/files";
+import { readMinecraftProps } from "@/lib/servers/minecraft-actions";
 import { SERVERS_NAMESPACE, serverRuntimeStatus } from "@/lib/servers/k8s";
 import { podMetrics } from "@/lib/k8s/resources";
 import {
@@ -70,6 +72,11 @@ export default async function ServerDetailPage({
   ]);
   const diskUsed = usageOf(usage, vol);
   const diskRatio = quotaRatio(diskUsed, server.diskGi);
+
+  // Propriétés Minecraft (server.properties) pour le panneau dédié.
+  const mcProps = server.isMinecraft
+    ? await readMinecraftProps(server.id).catch(() => null)
+    : null;
 
   const running = server.desiredState === "running";
   // Console active dès que le serveur est censé tourner ou qu'un pod existe
@@ -169,6 +176,15 @@ export default async function ServerDetailPage({
           )}
         </Info>
       </section>
+
+      {server.isMinecraft && mcProps && !("error" in mcProps) && (
+        <MinecraftPanel
+          serverId={server.id}
+          initial={mcProps.values}
+          exists={mcProps.exists}
+          canEdit={can("files.write")}
+        />
+      )}
 
       {Object.keys(server.env).length > 0 && (
         <details className="group rounded-xl border border-border bg-card">

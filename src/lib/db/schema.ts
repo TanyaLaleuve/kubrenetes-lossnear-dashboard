@@ -158,6 +158,11 @@ export const servers = pgTable(
      * plafond : au-delà, il faut supprimer une sauvegarde avant d'en créer.
      */
     backupLimit: integer("backup_limit").notNull().default(0),
+    /**
+     * Serveur Minecraft (détecté à la création via la catégorie de l'egg) :
+     * active le panneau de propriétés dédié et l'acceptation auto de l'EULA.
+     */
+    isMinecraft: boolean("is_minecraft").notNull().default(false),
     desiredState: serverState("desired_state").notNull().default("stopped"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

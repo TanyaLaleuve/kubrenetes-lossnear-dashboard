@@ -84,8 +84,18 @@ function buildMainContainer(server: Server): V1Container {
     image: server.image,
     // Serveur egg : commande shell (startup) avec substitution {{VAR}}.
     // Serveur image libre : args optionnels (`command`), sinon entrypoint image.
+    // Serveur Minecraft : on pré-accepte l'EULA (eula.txt) avant le démarrage
+    // du process, sinon le serveur s'arrête au 1er boot en réclamant l'accord.
     ...(server.startup
-      ? { command: ["/bin/sh", "-c", normalizeScript(substituteVars(server.startup, vars))] }
+      ? {
+          command: [
+            "/bin/sh",
+            "-c",
+            (server.isMinecraft
+              ? "printf 'eula=true\\n' > eula.txt 2>/dev/null || true\n"
+              : "") + normalizeScript(substituteVars(server.startup, vars)),
+          ],
+        }
       : server.command
         ? { args: server.command.split(/\s+/).filter(Boolean) }
         : {}),
