@@ -137,6 +137,12 @@ export const servers = pgTable(
     mountPath: varchar("mount_path", { length: 255 }).notNull().default("/data"),
     /** Nœud Kubernetes assigné (pour la migration / placement statique). */
     nodeName: varchar("node_name", { length: 255 }),
+    /**
+     * Cloisonnement réseau : true = le serveur ne joint qu'Internet (pas le
+     * réseau interne : base, agent, API Kubernetes, services de l'hôte).
+     * Défaut volontairement fermé ; ouvrir demande une permission dédiée.
+     */
+    isolated: boolean("isolated").notNull().default(true),
     desiredState: serverState("desired_state").notNull().default("stopped"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

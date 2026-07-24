@@ -1,12 +1,20 @@
 "use client";
 
 import { useActionState } from "react";
-import { AlertTriangle, ArrowRightLeft, RefreshCw, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { ToggleSwitch } from "@/components/ToggleSwitch";
 import {
   deleteServer,
   migrateServerAction,
   reinstallServerAction,
+  updateServerNetworkAction,
   type ServerFormState,
 } from "@/lib/servers/actions";
 import type { Server as ServerType } from "@/lib/db/schema";
@@ -21,6 +29,7 @@ export function ServerManagementForm({
   nodes,
   canManage,
   isPrivileged,
+  canOpenNetwork,
 }: {
   server: ServerType;
   nodes: NodeOption[];
@@ -28,6 +37,8 @@ export function ServerManagementForm({
   canManage: boolean;
   /** Propriétaire/admin uniquement : seul habilité à supprimer le serveur. */
   isPrivileged: boolean;
+  /** Permission servers.network_open : lever le cloisonnement réseau. */
+  canOpenNetwork: boolean;
 }) {
   const [reinstallState, reinstallAction, reinstallPending] = useActionState<
     ServerFormState,
@@ -38,6 +49,11 @@ export function ServerManagementForm({
     ServerFormState,
     FormData
   >(migrateServerAction, {});
+
+  const [networkState, networkAction, networkPending] = useActionState<
+    ServerFormState,
+    FormData
+  >(updateServerNetworkAction, {});
 
   return (
     <div className="space-y-6">
@@ -154,7 +170,69 @@ export function ServerManagementForm({
         </form>
       </section>
 
-      {/* 3. Zone Dangereuse / Suppression */}
+      {/* 3. Cloisonnement réseau */}
+      <section aria-label="Réseau" className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <div>
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <ShieldCheck className="size-5 text-success" /> Cloisonnement réseau
+          </h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Un serveur cloisonné ne joint qu&apos;Internet. Il ne peut pas
+            atteindre le réseau interne : base de données, agent de fichiers,
+            API Kubernetes, autres serveurs, services de la machine hôte.
+          </p>
+        </div>
+
+        {networkState.error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/15 p-3 text-xs text-destructive">
+            {networkState.error}
+          </div>
+        )}
+
+        {networkState.success && (
+          <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 text-xs text-accent">
+            {networkState.success}
+          </div>
+        )}
+
+        <form action={networkAction} className="space-y-4 pt-2 border-t border-border">
+          <input type="hidden" name="serverId" value={server.id} />
+
+          <ToggleSwitch
+            name="isolated"
+            defaultChecked={server.isolated}
+            disabled={!canOpenNetwork}
+            label="Cloisonner ce serveur (recommandé)"
+            description={
+              canOpenNetwork
+                ? "Décocher n'est justifié que pour un serveur de confiance qui doit joindre un service interne."
+                : "Tu n'as pas la permission de lever le cloisonnement."
+            }
+          />
+
+          {!server.isolated && (
+            <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+              Ce serveur n&apos;est pas cloisonné : un programme qui y tourne
+              peut atteindre tout le réseau interne.
+            </p>
+          )}
+
+          {canOpenNetwork && (
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={networkPending}
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 disabled:opacity-50 transition-colors"
+              >
+                <ShieldCheck className="size-4" />
+                {networkPending ? "Application..." : "Enregistrer"}
+              </button>
+            </div>
+          )}
+        </form>
+      </section>
+
+      {/* 4. Zone Dangereuse / Suppression */}
       {isPrivileged && (
         <section aria-label="Zone dangereuse" className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 space-y-4">
           <div>

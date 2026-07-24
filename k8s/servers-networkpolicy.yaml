@@ -1,0 +1,53 @@
+# Cloisonnement réseau des serveurs de jeu.
+#
+# Un serveur porte le label lossnear.com/network=isolated tant que son
+# cloisonnement est actif (défaut). Cette politique ne sélectionne que ces
+# pods-là : lever le cloisonnement (permission servers.network_open) retire le
+# label, donc plus aucune politique ne s'applique au pod.
+#
+# Sortie autorisée : Internet + DNS du cluster.
+# Sortie bloquée   : tout le réseau privé (base du dashboard, agent de fichiers,
+#                    API Kubernetes, autres serveurs) ET l'IP publique du nœud
+#                    (où écoutent MariaDB, Redis, Mongo — un pod atteint l'hôte
+#                    par cette IP, sans passer par les règles ufw).
+#
+# L'entrée n'est pas restreinte : les joueurs arrivent par hostPort, et les
+# réponses aux connexions entrantes ne sont pas concernées par la sortie.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: servers-isolated-egress
+  namespace: lossnear-servers
+  labels:
+    app.kubernetes.io/part-of: lossnear
+spec:
+  podSelector:
+    matchLabels:
+      lossnear.com/network: isolated
+  policyTypes:
+    - Egress
+  egress:
+    # DNS du cluster : indispensable pour résoudre les hôtes de téléchargement.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Internet public uniquement : les plages privées, le lien-local (métadonnées
+    # cloud) et l'IP publique du nœud sont exclus.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 103.109.234.50/32

@@ -25,6 +25,11 @@ export const DASHBOARD_PERMISSION_GROUPS = [
         label: "Voir tous les serveurs du cluster",
         hint: "Sinon : uniquement les siens + ceux où il est invité.",
       },
+      {
+        key: "servers.network_open",
+        label: "Ouvrir le réseau interne d'un serveur",
+        hint: "Lève le cloisonnement (accès base, agent, API, services de l'hôte). À n'accorder qu'à des serveurs de confiance.",
+      },
     ],
   },
   {
@@ -85,6 +90,18 @@ export function canViewAllServers(user: {
   permissions: string[];
 }): boolean {
   return canAccess(user, "servers.view_all");
+}
+
+/**
+ * L'utilisateur peut-il lever le cloisonnement réseau d'un serveur ? Sans
+ * cette permission le serveur reste cloisonné (défaut fermé) : il ne joint
+ * qu'Internet, jamais le réseau interne.
+ */
+export function canOpenNetwork(user: {
+  isAdmin: boolean;
+  permissions: string[];
+}): boolean {
+  return canAccess(user, "servers.network_open");
 }
 
 /**

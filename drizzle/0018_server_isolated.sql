@@ -1,0 +1,1 @@
+ALTER TABLE "servers" ADD COLUMN "isolated" boolean DEFAULT true NOT NULL;

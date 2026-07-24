@@ -134,7 +134,15 @@ function buildStatefulSet(server: Server): V1StatefulSet {
       replicas: server.desiredState === "running" ? 1 : 0,
       selector: { matchLabels: { "app.kubernetes.io/name": server.slug } },
       template: {
-        metadata: { labels: labels(server) },
+        metadata: {
+          labels: {
+            ...labels(server),
+            // Sélecteur de la NetworkPolicy de cloisonnement : « isolated »
+            // restreint la sortie à Internet, « open » n'est sélectionné par
+            // aucune politique (accès réseau interne complet).
+            "lossnear.com/network": server.isolated ? "isolated" : "open",
+          },
+        },
         spec: {
           terminationGracePeriodSeconds: 30,
           ...(server.nodeName ? { nodeName: server.nodeName } : {}),

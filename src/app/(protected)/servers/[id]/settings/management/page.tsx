@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ServerManagementForm } from "@/components/ServerManagementForm";
 import { currentUser } from "@/lib/auth/user";
+import { canOpenNetwork } from "@/lib/auth/dashboard-permissions";
 import { listNodes } from "@/lib/k8s/resources";
 import { serverAccess } from "@/lib/servers/authz";
 
@@ -37,6 +38,7 @@ export default async function ServerSettingsManagementPage({
         nodes={nodes}
         canManage={canManage}
         isPrivileged={access.privileged}
+        canOpenNetwork={canOpenNetwork(user)}
       />
     </div>
   );

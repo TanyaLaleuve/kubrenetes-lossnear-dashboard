@@ -22,6 +22,7 @@ import {
 } from "./ports";
 import {
   canChoosePort,
+  canOpenNetwork,
   DEFAULT_DASHBOARD_PERMISSIONS,
   sanitizeDashboardPermissions,
 } from "@/lib/auth/dashboard-permissions";
@@ -657,6 +658,51 @@ export async function migrateServerAction(
   revalidatePath(`/servers/${serverId}`);
   revalidatePath(`/servers/${serverId}/settings/management`);
   return { success: nodeName ? `Serveur épinglé sur ${nodeName}.` : "Placement remis en automatique." };
+}
+
+/**
+ * Cloisonnement réseau du serveur. Réservé à la permission dédiée : lever le
+ * cloisonnement donne au serveur l'accès au réseau interne (base, agent, API
+ * Kubernetes, services de l'hôte). Défaut fermé, on ne l'ouvre qu'exprès.
+ */
+export async function updateServerNetworkAction(
+  _prev: ServerFormState,
+  formData: FormData,
+): Promise<ServerFormState> {
+  const user = await currentUser();
+  const serverId = String(formData.get("serverId") ?? "");
+  const server = await requireServerPermission(user, serverId, "settings.manage");
+
+  if (!canOpenNetwork(user)) {
+    return { error: "Tu n'as pas la permission de modifier le cloisonnement." };
+  }
+
+  // Case décochée = absente du FormData.
+  const isolated = formData.get("isolated") !== null;
+  if (isolated === server.isolated) {
+    return { success: "Aucun changement." };
+  }
+
+  const [updated] = await db()
+    .update(schema.servers)
+    .set({ isolated, updatedAt: new Date() })
+    .where(eq(schema.servers.id, server.id))
+    .returning();
+
+  // Le label réseau vit dans le template du pod : il faut remplacer la spec,
+  // puis recréer le pod pour que la NetworkPolicy le (dé)sélectionne.
+  await updateServerWorkload(updated);
+  if (server.desiredState === "running") {
+    await forceDeletePod(server.slug);
+  }
+
+  revalidatePath(`/servers/${serverId}`);
+  revalidatePath(`/servers/${server.shortId}/settings/management`);
+  return {
+    success: isolated
+      ? "Serveur cloisonné : accès au réseau interne coupé."
+      : "Cloisonnement levé : ce serveur atteint le réseau interne.",
+  };
 }
 
 /** Réinstallation du serveur : suppression du marqueur d'install et relance de l'initContainer. */
