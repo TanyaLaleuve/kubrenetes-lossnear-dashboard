@@ -405,8 +405,32 @@ export async function startServer(id: string) {
   await setDesiredState(id, "running", "control.start");
 }
 
+/**
+ * Arrêt gracieux : envoie la commande d'arrêt de l'egg (ex. `stop`) pour que le
+ * serveur sauvegarde et se ferme proprement, puis met à l'état arrêté et scale
+ * à 0 (le délai de grâce de 30 s laisse la sauvegarde se terminer ; le passage
+ * à 0 réplique empêche le conteneur de redémarrer tout seul).
+ */
 export async function stopServer(id: string) {
-  await setDesiredState(id, "stopped", "control.stop");
+  const user = await currentUser();
+  const server = await requireServerPermission(user, id, "control.stop");
+
+  // Commande d'arrêt façon Pterodactyl : texte envoyé au stdin. Un `^...`
+  // (ex. ^C) signifie « signal » -> on laisse le SIGTERM du scale-à-0 faire.
+  const stop = server.stopCommand?.trim();
+  if (stop && !stop.startsWith("^") && server.desiredState === "running") {
+    const { sendConsoleCommand } = await import("./exec");
+    await sendConsoleCommand(server.slug, stop).catch(() => {});
+  }
+
+  const [updated] = await db()
+    .update(schema.servers)
+    .set({ desiredState: "stopped", updatedAt: new Date() })
+    .where(eq(schema.servers.id, server.id))
+    .returning();
+  await applyServer(updated); // scale à 0 (SIGTERM + grâce 30 s)
+  revalidatePath(`/servers/${id}`);
+  revalidatePath("/servers");
 }
 
 /** Arrêt dur immédiat : état arrêté + suppression forcée du pod. */
@@ -424,16 +448,31 @@ export async function killServer(id: string) {
   revalidatePath("/servers");
 }
 
+/**
+ * Redémarrage gracieux : envoie la commande d'arrêt de l'egg ; le serveur
+ * sauvegarde et se ferme, et le conteneur est relancé automatiquement (le
+ * serveur reste à l'état « démarré »). Sans commande d'arrêt (ou signal `^`),
+ * on supprime le pod, que le StatefulSet recrée aussitôt.
+ */
 export async function restartServer(id: string) {
   const user = await currentUser();
   const server = await requireServerPermission(user, id, "control.restart");
   if (server.desiredState !== "running") {
     throw new Error("Le serveur n'est pas démarré.");
   }
-  // Suppression du pod : le StatefulSet le recrée aussitôt. Si le pod n'existe
-  // pas (déjà tombé), le scale à 1 le recrée — on ne doit pas planter sur 404.
-  await forceDeletePod(server.slug);
-  await setReplicas(server.slug, 1).catch(() => {});
+
+  const stop = server.stopCommand?.trim();
+  if (stop && !stop.startsWith("^")) {
+    // Le process quitte proprement puis kubelet relance le conteneur
+    // (restartPolicy Always) : c'est le redémarrage, sans perdre la sauvegarde.
+    const { sendConsoleCommand } = await import("./exec");
+    await sendConsoleCommand(server.slug, stop).catch(() => {});
+  } else {
+    // Pas de commande d'arrêt : suppression du pod, recréé par le StatefulSet.
+    await forceDeletePod(server.slug);
+    await setReplicas(server.slug, 1).catch(() => {});
+  }
+
   revalidatePath(`/servers/${id}`);
   revalidatePath("/servers");
 }
