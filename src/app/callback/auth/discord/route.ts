@@ -7,7 +7,8 @@ import { getSession } from "@/lib/auth/session";
 import { discordConfigured, fetchDiscordProfile } from "@/lib/auth/discord";
 
 /**
- * Callback OAuth Discord. Trois cas :
+ * Callback OAuth Discord (URL publique : dashboard.lossnear.com/callback/auth/discord).
+ * Trois cas :
  *  1. Ce Discord est déjà lié à un compte -> connexion à ce compte.
  *  2. Session ouverte (compte k8s) sans Discord lié -> on lie ce Discord au compte.
  *  3. Sinon -> création d'un compte public (origin=bot) lié à ce Discord.

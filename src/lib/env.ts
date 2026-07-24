@@ -23,7 +23,7 @@ const schema = z.object({
   /** URL de callback OAuth (doit être autorisée dans le portail Discord). */
   DISCORD_REDIRECT_URI: z
     .string()
-    .default("https://dashboard.lossnear.com/api/auth/discord/callback"),
+    .default("https://dashboard.lossnear.com/callback/auth/discord"),
 });
 
 let cached: z.infer<typeof schema> | null = null;

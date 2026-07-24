@@ -23,3 +23,15 @@ spec:
                 name: k8s-dashboard
                 port:
                   name: http
+    # Domaine public du bot : même application (le middleware Next réécrit la
+    # racine de dashboard.lossnear.com vers le dashboard bot).
+    - host: dashboard.lossnear.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: k8s-dashboard
+                port:
+                  name: http
