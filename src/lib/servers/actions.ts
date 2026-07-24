@@ -158,15 +158,16 @@ async function reserveSlot(
   const allowed = userAllowedPorts(user);
 
   // Port demandé explicitement : uniquement si l'utilisateur a la permission.
-  // Sinon on ignore et on attribue automatiquement.
+  // On refuse seulement les cas bloquants ; un port occupé (avertissement) est
+  // accepté — le serveur est créé mais ne démarrera pas tant qu'il est pris.
   if (desiredPort != null && canChoosePort(user)) {
-    const problem = portProblem(desiredPort, allowed, usedPorts, clusterPorts);
-    if (problem) return { error: problem };
+    const c = classifyPort(desiredPort, allowed, usedPorts, clusterPorts);
+    if (c.blocked) return { error: c.blocked };
     return { hostPort: desiredPort };
   }
 
-  // Sinon : premier port libre — dans la liste allouée si définie, sinon dans
-  // la plage d'attribution automatique (déjà ouverte au pare-feu).
+  // Sinon : premier port réellement libre (ni bloqué ni occupé) — dans la liste
+  // allouée si définie, sinon dans la plage d'attribution automatique.
   const candidates =
     allowed ??
     Array.from(
@@ -174,7 +175,8 @@ async function reserveSlot(
       (_, i) => AUTO_PORT_MIN + i,
     );
   for (const p of candidates) {
-    if (!portProblem(p, allowed, usedPorts, clusterPorts)) return { hostPort: p };
+    const c = classifyPort(p, allowed, usedPorts, clusterPorts);
+    if (!c.blocked && !c.warning) return { hostPort: p };
   }
   return {
     error: allowed
@@ -184,29 +186,56 @@ async function reserveSlot(
 }
 
 /**
- * Raison pour laquelle un port ne peut pas être pris, ou null s'il est libre.
- * Partagé par la création, la modification et la vérification en direct.
+ * Classe un port : `blocked` = interdit (création refusée), `warning` = permis
+ * mais occupé par un service en cours (créable, mais le serveur ne démarrera
+ * pas tant que le port n'est pas libre), vide = libre.
+ *
+ * - hors bornes / hors allowlist / déjà attribué à un autre serveur → bloquant
+ *   (intégrité et droits).
+ * - port réservé (service système) ou déjà pris par un pod/service en cours →
+ *   avertissement seulement.
  */
-function portProblem(
+type PortClass = { blocked?: string; warning?: string };
+
+function classifyPort(
   port: number,
   allowed: number[] | null,
-  usedPorts: Set<number>,
-  clusterPorts: Set<number>,
-): string | null {
+  usedByServers: Set<number>,
+  runningPorts: Set<number>,
+): PortClass {
   if (port < PORT_MIN || port > PORT_MAX) {
-    return `Port hors bornes (${PORT_MIN}-${PORT_MAX}).`;
-  }
-  if (isReservedPort(port)) {
-    return `Le port ${port} est réservé (service de l'hôte ou Kubernetes).`;
+    return { blocked: `Port hors bornes (${PORT_MIN}-${PORT_MAX}).` };
   }
   if (allowed && !allowed.includes(port)) {
-    return `Le port ${port} ne fait pas partie de tes ports autorisés.`;
+    return { blocked: `Le port ${port} ne fait pas partie de tes ports autorisés.` };
   }
-  if (usedPorts.has(port)) {
-    return `Le port ${port} est déjà utilisé par un autre serveur.`;
+  if (usedByServers.has(port)) {
+    return { blocked: `Le port ${port} est déjà attribué à un autre serveur.` };
   }
-  if (clusterPorts.has(port)) {
-    return `Le port ${port} est déjà occupé sur le nœud.`;
+  if (isReservedPort(port)) {
+    return {
+      warning: `Le port ${port} est utilisé par un service système : le serveur pourra être créé mais ne démarrera pas tant que ce port est occupé.`,
+    };
+  }
+  if (runningPorts.has(port)) {
+    return {
+      warning: `Le port ${port} est déjà utilisé par un service en cours : le serveur pourra être créé mais ne démarrera pas tant que ce port est occupé.`,
+    };
+  }
+  return {};
+}
+
+/**
+ * Vérifie qu'un port est libre pour DÉMARRER un serveur (aucun service en cours
+ * dessus). Renvoie un message d'erreur ou null.
+ */
+async function portBusyToStart(hostPort: number): Promise<string | null> {
+  if (isReservedPort(hostPort)) {
+    return `Le port ${hostPort} est occupé par un service système : démarrage impossible tant qu'il n'est pas libre.`;
+  }
+  const clusterPorts = await clusterHostPorts();
+  if (clusterPorts.has(hostPort)) {
+    return `Le port ${hostPort} est déjà utilisé par un autre service en cours : démarrage impossible tant qu'il n'est pas libre.`;
   }
   return null;
 }
@@ -215,7 +244,7 @@ function portProblem(
 export async function checkPortAvailability(
   port: number,
   serverId?: string,
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; warning?: boolean; message: string }> {
   const user = await currentUser();
   if (!canChoosePort(user)) {
     return { ok: false, message: "Tu n'as pas la permission de choisir le port." };
@@ -235,15 +264,10 @@ export async function checkPortAvailability(
   const clusterPorts = await clusterHostPorts();
   if (own != null) clusterPorts.delete(own);
 
-  const problem = portProblem(
-    port,
-    userAllowedPorts(user),
-    usedPorts,
-    clusterPorts,
-  );
-  return problem
-    ? { ok: false, message: problem }
-    : { ok: true, message: `Port ${port} disponible.` };
+  const c = classifyPort(port, userAllowedPorts(user), usedPorts, clusterPorts);
+  if (c.blocked) return { ok: false, message: c.blocked };
+  if (c.warning) return { ok: true, warning: true, message: c.warning };
+  return { ok: true, message: `Port ${port} disponible.` };
 }
 
 export async function createServer(
@@ -391,6 +415,12 @@ async function setDesiredState(
 ) {
   const user = await currentUser();
   const server = await requireServerPermission(user, id, permission);
+  // Démarrage : refuse si le port externe est occupé par un service en cours
+  // (un port peut avoir été alloué en connaissant qu'il était pris).
+  if (state === "running") {
+    const busy = await portBusyToStart(server.hostPort);
+    if (busy) throw new Error(busy);
+  }
   const [updated] = await db()
     .update(schema.servers)
     .set({ desiredState: state, updatedAt: new Date() })
@@ -628,13 +658,14 @@ export async function updateServerGeneralSettings(
     const clusterPorts = await clusterHostPorts();
     clusterPorts.delete(server.hostPort); // son propre pod ne compte pas
 
-    const problem = portProblem(
+    const c = classifyPort(
       input.hostPort,
       userAllowedPorts(user),
       new Set(others.map((r) => r.hostPort)),
       clusterPorts,
     );
-    if (problem) return { error: problem };
+    if (c.blocked) return { error: c.blocked };
+    // Port occupé (avertissement) toléré : le démarrage sera bloqué à la place.
     newHostPort = input.hostPort;
   }
 
@@ -1040,16 +1071,62 @@ export async function updateUserGrants(
   });
   if (!parsed.success) return { error: parsed.error.issues[0].message };
 
-  // Ports autorisés : on valide la syntaxe et on normalise (ou null si vide).
+  // Ports autorisés : syntaxe + bornes, puis anti-chevauchement entre comptes
+  // (un même port ne peut pas être autorisé à deux personnes).
   let portAllowlist: string | null = null;
+  let portInfo = "";
   const spec = parsed.data.portAllowlist?.trim();
   if (spec) {
+    let wanted: number[];
     try {
-      parsePortSpec(spec); // valide la syntaxe et les bornes
-      portAllowlist = spec;
+      wanted = parsePortSpec(spec); // valide la syntaxe et les bornes
     } catch (e) {
       return { error: e instanceof Error ? e.message : "Liste de ports invalide." };
     }
+
+    // Chevauchement avec les allowlists explicites des AUTRES comptes.
+    const others = await db()
+      .select({ username: schema.users.username, allow: schema.users.portAllowlist })
+      .from(schema.users)
+      .where(ne(schema.users.id, parsed.data.userId));
+    const wantedSet = new Set(wanted);
+    const conflicts = new Map<number, string>();
+    for (const o of others) {
+      if (!o.allow?.trim()) continue;
+      let theirs: number[];
+      try {
+        theirs = parsePortSpec(o.allow);
+      } catch {
+        continue;
+      }
+      for (const p of theirs) {
+        if (wantedSet.has(p) && !conflicts.has(p)) conflicts.set(p, o.username);
+      }
+    }
+    if (conflicts.size > 0) {
+      const list = [...conflicts.entries()]
+        .slice(0, 8)
+        .map(([p, u]) => `${p} (déjà à ${u})`)
+        .join(", ");
+      return {
+        error: `Ces ports sont déjà autorisés à un autre compte : ${list}. Un port ne peut pas être partagé.`,
+      };
+    }
+
+    // Info non bloquante : ports actuellement occupés par un service en cours.
+    const clusterPorts = await clusterHostPorts();
+    const serverRows = await db()
+      .select({ hostPort: schema.servers.hostPort })
+      .from(schema.servers);
+    const serverPorts = new Set(serverRows.map((r) => r.hostPort));
+    const occupied = wanted.filter(
+      (p) => isReservedPort(p) || clusterPorts.has(p) || serverPorts.has(p),
+    );
+    if (occupied.length > 0) {
+      portInfo = ` À noter : ${occupied.slice(0, 12).join(", ")} déjà utilisé(s) par un service en cours — un serveur pourra y être créé mais ne démarrera pas tant qu'ils sont occupés.`;
+    }
+
+    portAllowlist = spec;
   }
 
   // Un admin ne peut pas modifier son propre compte ici (protection anti-lockout).
@@ -1072,5 +1149,5 @@ export async function updateUserGrants(
     );
 
   revalidatePath("/admin/users");
-  return { success: "Droits et quotas enregistrés." };
+  return { success: `Droits et quotas enregistrés.${portInfo}` };
 }

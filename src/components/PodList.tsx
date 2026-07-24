@@ -1,12 +1,27 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, Skull } from "lucide-react";
 import type { V1Pod } from "@kubernetes/client-node";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { StatusBadge } from "@/components/StatusBadge";
 import { deletePodAction } from "@/lib/k8s/actions";
+import { killServer } from "@/lib/servers/actions";
 import { formatAge, podStatus } from "@/lib/k8s/format";
 
-export function PodList({ pods }: { pods: V1Pod[] }) {
+/** Accès d'un utilisateur au serveur d'un pod (page pods). */
+export type ServerPodInfo = {
+  serverId: string;
+  shortId: string;
+  /** Permission control.kill : proposer Kill au lieu de supprimer le pod. */
+  canKill: boolean;
+};
+
+export function PodList({
+  pods,
+  serverInfo = {},
+}: {
+  pods: V1Pod[];
+  serverInfo?: Record<string, ServerPodInfo>;
+}) {
   const byNamespace = new Map<string, V1Pod[]>();
   for (const pod of pods) {
     const ns = pod.metadata?.namespace ?? "?";
@@ -35,13 +50,26 @@ export function PodList({ pods }: { pods: V1Pod[] }) {
                 {nsPods.map((pod) => {
                   const name = pod.metadata?.name ?? "?";
                   const status = podStatus(pod);
+                  const server = pod.metadata?.uid
+                    ? serverInfo[pod.metadata.uid]
+                    : undefined;
                   return (
                     <li
                       key={pod.metadata?.uid}
                       className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3"
                     >
                       <div className="min-w-0 flex-1 basis-52">
-                        <p className="truncate font-mono text-sm">{name}</p>
+                        {/* Pod de serveur accessible : le nom mène à sa page. */}
+                        {server ? (
+                          <Link
+                            href={`/servers/${server.shortId}`}
+                            className="truncate font-mono text-sm text-accent hover:underline"
+                          >
+                            {name}
+                          </Link>
+                        ) : (
+                          <p className="truncate font-mono text-sm">{name}</p>
+                        )}
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           prêt {status.ready} · {status.restarts} redémarrages ·{" "}
                           {formatAge(pod.metadata?.creationTimestamp)}
@@ -56,11 +84,26 @@ export function PodList({ pods }: { pods: V1Pod[] }) {
                         >
                           <FileText className="size-3.5" aria-hidden />
                         </Link>
-                        <ConfirmButton
-                          action={deletePodAction.bind(null, namespace, name)}
-                        >
-                          Supprimer
-                        </ConfirmButton>
+                        {server ? (
+                          // Pod de serveur : « supprimer » = Kill (sinon le
+                          // StatefulSet recrée aussitôt le pod). Réservé à qui a
+                          // la permission control.kill.
+                          server.canKill && (
+                            <ConfirmButton
+                              action={killServer.bind(null, server.serverId)}
+                              confirmLabel="Confirmer le kill"
+                            >
+                              <Skull className="mr-1 size-3.5" aria-hidden />
+                              Kill
+                            </ConfirmButton>
+                          )
+                        ) : (
+                          <ConfirmButton
+                            action={deletePodAction.bind(null, namespace, name)}
+                          >
+                            Supprimer
+                          </ConfirmButton>
+                        )}
                       </div>
                     </li>
                   );
