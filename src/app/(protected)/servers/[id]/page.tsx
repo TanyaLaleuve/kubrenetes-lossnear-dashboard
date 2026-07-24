@@ -17,6 +17,8 @@ import {
 import { serverAccess } from "@/lib/servers/authz";
 import { serverNavProps } from "@/lib/servers/nav";
 import { serverAddress } from "@/lib/servers/address";
+import { diskUsage, quotaRatio, usageOf } from "@/lib/servers/disk";
+import { resolveVolumeDir } from "@/lib/servers/files";
 import { SERVERS_NAMESPACE, serverRuntimeStatus } from "@/lib/servers/k8s";
 import { podMetrics } from "@/lib/k8s/resources";
 import {
@@ -60,6 +62,14 @@ export default async function ServerDetailPage({
       ? await podMetrics(SERVERS_NAMESPACE).catch(() => [])
       : [];
   const podMetric = metrics.find((m) => m.metadata.name === `${server.slug}-0`);
+
+  // Usage disque réel (local-path n'applique pas de quota : voir lib/servers/disk).
+  const [usage, vol] = await Promise.all([
+    diskUsage(),
+    resolveVolumeDir(server.slug),
+  ]);
+  const diskUsed = usageOf(usage, vol);
+  const diskRatio = quotaRatio(diskUsed, server.diskGi);
 
   const running = server.desiredState === "running";
   // Console active dès que le serveur est censé tourner ou qu'un pod existe
@@ -148,7 +158,16 @@ export default async function ServerDetailPage({
             ? `${formatCpu(parseCpu(podMetric.containers[0]?.usage.cpu ?? "0"))} / ${formatCpu(server.cpuMilli / 1000)}`
             : `${formatCpu(server.cpuMilli / 1000)} alloués`}
         </Info>
-        <Info label="Disque">{server.diskGi} Gio (persistant)</Info>
+        <Info label="Disque">
+          {diskUsed !== null ? (
+            <span className={diskRatio !== null && diskRatio >= 0.9 ? "text-destructive" : undefined}>
+              {formatBytes(diskUsed)} / {server.diskGi} Gio
+              {diskRatio !== null && ` (${Math.round(diskRatio * 100)} %)`}
+            </span>
+          ) : (
+            `${server.diskGi} Gio (persistant)`
+          )}
+        </Info>
       </section>
 
       {Object.keys(server.env).length > 0 && (

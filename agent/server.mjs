@@ -29,7 +29,11 @@ import {
   writeFileSync,
 } from "node:fs";
 import { generateKeyPairSync, timingSafeEqual } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { startSftp } from "./sftp.mjs";
+
+const execFileAsync = promisify(execFile);
 
 const STORAGE_ROOT = process.env.STORAGE_ROOT || "/data-root";
 const TOKEN = process.env.AGENT_TOKEN || "";
@@ -123,6 +127,61 @@ async function listDir(target) {
   return items;
 }
 
+/**
+ * Occupation disque par volume. `local-path` n'applique AUCUN quota : la taille
+ * du PVC est décorative, un serveur peut remplir la partition du nœud (et donc
+ * casser etcd et les voisins). On mesure donc l'usage réel ici pour que le
+ * dashboard puisse afficher et faire respecter les quotas.
+ *
+ * `du` est coûteux sur de gros volumes : le résultat est mis en cache et
+ * recalculé au plus une fois par intervalle.
+ */
+const DISK_CACHE_MS = Number(process.env.DISK_CACHE_MS || 60_000);
+let diskCache = { at: 0, volumes: {} };
+let diskScanning = null;
+
+async function scanDiskUsage() {
+  const volumes = {};
+  let entries = [];
+  try {
+    entries = await readdir(STORAGE_ROOT, { withFileTypes: true });
+  } catch {
+    return volumes;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    try {
+      // -s : total du dossier, -k : en kibioctets (busybox n'a pas -b).
+      const { stdout } = await execFileAsync(
+        "du",
+        ["-sk", join(STORAGE_ROOT, entry.name)],
+        { timeout: 120_000, maxBuffer: 1 << 20 },
+      );
+      const kb = Number.parseInt(stdout.trim().split(/\s+/)[0], 10);
+      if (Number.isFinite(kb)) volumes[entry.name] = kb * 1024;
+    } catch {
+      // volume illisible / disparu en cours de scan : on l'ignore
+    }
+  }
+  return volumes;
+}
+
+async function diskUsage() {
+  if (Date.now() - diskCache.at < DISK_CACHE_MS) return diskCache;
+  // Un seul scan à la fois, même si plusieurs requêtes arrivent ensemble.
+  if (!diskScanning) {
+    diskScanning = scanDiskUsage()
+      .then((volumes) => {
+        diskCache = { at: Date.now(), volumes };
+        return diskCache;
+      })
+      .finally(() => {
+        diskScanning = null;
+      });
+  }
+  return diskScanning;
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://agent");
@@ -132,6 +191,12 @@ const server = createServer(async (req, res) => {
     if (route === "/healthz") return json(res, 200, { ok: true });
 
     if (!authorized(req)) return json(res, 401, { error: "non autorisé" });
+
+    // Usage disque : pas de volume ciblé, doit passer avant safePath().
+    if (req.method === "GET" && route === "/disk/usage") {
+      const { at, volumes } = await diskUsage();
+      return json(res, 200, { scannedAt: at, volumes });
+    }
 
     const vol = url.searchParams.get("vol") || "";
     const rel = url.searchParams.get("path") || "";
