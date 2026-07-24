@@ -31,8 +31,8 @@ import {
   clusterHostPorts,
   destroyServer,
   forceDeletePod,
+  setReplicas,
   updateServerWorkload,
-  SERVERS_NAMESPACE,
 } from "./k8s";
 
 export type ServerFormState = { error?: string; success?: string };
@@ -430,13 +430,12 @@ export async function restartServer(id: string) {
   if (server.desiredState !== "running") {
     throw new Error("Le serveur n'est pas démarré.");
   }
-  // Suppression du pod : le StatefulSet le recrée aussitôt.
-  const { coreApi } = await import("@/lib/k8s/client");
-  await coreApi().deleteNamespacedPod({
-    namespace: SERVERS_NAMESPACE,
-    name: `${server.slug}-0`,
-  });
+  // Suppression du pod : le StatefulSet le recrée aussitôt. Si le pod n'existe
+  // pas (déjà tombé), le scale à 1 le recrée — on ne doit pas planter sur 404.
+  await forceDeletePod(server.slug);
+  await setReplicas(server.slug, 1).catch(() => {});
   revalidatePath(`/servers/${id}`);
+  revalidatePath("/servers");
 }
 
 /**
