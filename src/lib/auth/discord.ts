@@ -11,6 +11,24 @@ export function discordConfigured(): boolean {
   return Boolean(e.DISCORD_CLIENT_ID && e.DISCORD_CLIENT_SECRET);
 }
 
+/**
+ * Origine publique (schéma + hôte) déduite des en-têtes du reverse proxy —
+ * `new URL(request.url).origin` renverrait l'adresse interne du conteneur
+ * (0.0.0.0:3000), inutilisable pour une redirection navigateur.
+ */
+export function publicOrigin(request: Request): string {
+  const h = request.headers;
+  const proto = (h.get("x-forwarded-proto") ?? "https").split(",")[0].trim();
+  const host = (
+    h.get("x-forwarded-host") ??
+    h.get("host") ??
+    "dashboard.lossnear.com"
+  )
+    .split(",")[0]
+    .trim();
+  return `${proto}://${host}`;
+}
+
 /** URL d'autorisation Discord (scopes minimaux : identifier le compte). */
 export function discordAuthorizeUrl(state: string): string {
   const e = env();

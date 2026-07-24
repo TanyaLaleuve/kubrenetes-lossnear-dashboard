@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { discordAuthorizeUrl, discordConfigured } from "@/lib/auth/discord";
+import { discordAuthorizeUrl, discordConfigured, publicOrigin } from "@/lib/auth/discord";
 
 /**
  * Démarre la connexion Discord (OAuth) : pose un état anti-CSRF en session puis
@@ -9,7 +9,7 @@ import { discordAuthorizeUrl, discordConfigured } from "@/lib/auth/discord";
  * renvoie vers la page de connexion bot avec un message.
  */
 export async function GET(request: Request) {
-  const origin = new URL(request.url).origin;
+  const origin = publicOrigin(request);
   if (!discordConfigured()) {
     return NextResponse.redirect(`${origin}/bot/login?error=config`);
   }

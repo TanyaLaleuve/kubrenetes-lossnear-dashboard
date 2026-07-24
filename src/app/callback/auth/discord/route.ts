@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth/session";
-import { discordConfigured, fetchDiscordProfile } from "@/lib/auth/discord";
+import { discordConfigured, fetchDiscordProfile, publicOrigin } from "@/lib/auth/discord";
 
 /**
  * Callback OAuth Discord (URL publique : dashboard.lossnear.com/callback/auth/discord).
@@ -15,7 +15,7 @@ import { discordConfigured, fetchDiscordProfile } from "@/lib/auth/discord";
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const origin = url.origin;
+  const origin = publicOrigin(request);
   const fail = (reason: string) =>
     NextResponse.redirect(`${origin}/bot/login?error=${reason}`);
 
