@@ -52,16 +52,21 @@ export function ServerConsole({
   }, [serverId, running]);
 
   useEffect(() => {
-    if (stickToBottom.current && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (!stickToBottom.current) return;
+    // Après le paint (le contenu ajouté est mis en page) : colle au bas.
+    const id = requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
   }, [lines]);
 
   function onScroll() {
     const el = scrollRef.current;
     if (!el) return;
+    // Marge généreuse : tant qu'on est proche du bas, on considère « collé ».
     stickToBottom.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      el.scrollHeight - el.scrollTop - el.clientHeight < 60;
   }
 
   async function send(event: React.FormEvent) {
