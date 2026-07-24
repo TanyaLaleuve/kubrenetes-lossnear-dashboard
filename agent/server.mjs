@@ -30,7 +30,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { generateKeyPairSync, timingSafeEqual } from "node:crypto";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { startSftp } from "./sftp.mjs";
 
@@ -122,10 +122,13 @@ async function listDir(target) {
       const full = join(target, entry.name);
       let size = 0;
       let mtime = 0;
+      let ctime = 0;
       try {
         const s = await stat(full);
         size = s.size;
         mtime = s.mtimeMs;
+        // birthtime = date de création (crtime ext4) ; 0 si non supporté.
+        ctime = s.birthtimeMs || 0;
       } catch {
         // lien cassé, etc.
       }
@@ -134,6 +137,7 @@ async function listDir(target) {
         dir: entry.isDirectory(),
         size,
         mtime,
+        ctime,
       };
     }),
   );
@@ -405,6 +409,87 @@ const server = createServer(async (req, res) => {
       await pipeline(Readable.fromWeb(upstream.body), createWriteStream(target));
       const s = await stat(target);
       return json(res, 200, { ok: true, size: s.size });
+    }
+
+    // Compression d'une sélection en une archive dans le volume.
+    if (req.method === "POST" && route === "/archive/compress") {
+      const body = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+      const rels = Array.isArray(body.paths) ? body.paths.slice(0, 5000) : [];
+      const format = body.format === "zip" ? "zip" : "targz";
+      const { base } = safePath(vol, "");
+      const { target: dest } = safePath(vol, String(body.dest || ""));
+      // Chaque entrée doit rester dans le volume ; on passe des chemins relatifs.
+      const items = [];
+      for (const r of rels) {
+        safePath(vol, r); // rejette une évasion
+        items.push(r.replace(/^[/\\]+/, ""));
+      }
+      if (items.length === 0) return json(res, 400, { error: "aucun fichier" });
+      if (format === "zip") {
+        await execFileAsync("zip", ["-r", "-q", dest, ...items], {
+          cwd: base,
+          timeout: 30 * 60_000,
+          maxBuffer: 1 << 20,
+        });
+      } else {
+        await execFileAsync("tar", ["-czf", dest, "-C", base, ...items], {
+          timeout: 30 * 60_000,
+          maxBuffer: 1 << 20,
+        });
+      }
+      const s = await stat(dest);
+      return json(res, 200, { ok: true, size: s.size });
+    }
+
+    // Extraction d'une archive (`vol`+`path`) dans un dossier de destination.
+    if (req.method === "POST" && route === "/archive/extract") {
+      const body = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+      const { target: archive } = safePath(vol, rel);
+      const { target: destDir } = safePath(vol, String(body.dest || ""));
+      await mkdir(destDir, { recursive: true });
+      const low = archive.toLowerCase();
+      if (low.endsWith(".zip")) {
+        await execFileAsync("unzip", ["-o", "-q", archive, "-d", destDir], {
+          timeout: 30 * 60_000, maxBuffer: 1 << 20,
+        });
+      } else if (low.endsWith(".tar.gz") || low.endsWith(".tgz")) {
+        await execFileAsync("tar", ["-xzf", archive, "-C", destDir], {
+          timeout: 30 * 60_000, maxBuffer: 1 << 20,
+        });
+      } else if (low.endsWith(".tar")) {
+        await execFileAsync("tar", ["-xf", archive, "-C", destDir], {
+          timeout: 30 * 60_000, maxBuffer: 1 << 20,
+        });
+      } else if (low.endsWith(".gz")) {
+        // .gz simple (un seul fichier) : décompresse en retirant l'extension.
+        await execFileAsync("sh", ["-c", `gunzip -kf "${archive}"`], {
+          timeout: 30 * 60_000, maxBuffer: 1 << 20,
+        });
+      } else {
+        return json(res, 400, {
+          error: "Format non pris en charge (zip, tar.gz, tar, gz).",
+        });
+      }
+      return json(res, 200, { ok: true });
+    }
+
+    // Flux d'archive d'une sélection (téléchargement groupé, sans fichier temp).
+    if (req.method === "POST" && route === "/archive/stream") {
+      const body = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+      const rels = Array.isArray(body.paths) ? body.paths.slice(0, 5000) : [];
+      const { base } = safePath(vol, "");
+      const items = [];
+      for (const r of rels) {
+        safePath(vol, r);
+        items.push(r.replace(/^[/\\]+/, ""));
+      }
+      if (items.length === 0) return json(res, 400, { error: "aucun fichier" });
+      res.writeHead(200, { "Content-Type": "application/gzip" });
+      const tar = spawn("tar", ["-czf", "-", "-C", base, ...items]);
+      tar.stdout.pipe(res);
+      tar.stderr.resume();
+      tar.on("error", () => res.destroy());
+      return;
     }
 
     // Création d'un backup : archive le volume `vol` (serveur arrêté en amont).

@@ -1,5 +1,7 @@
 # Agent de nœud lossnear (API fichiers HTTP + serveur SFTP).
 FROM node:24-alpine
+# zip/unzip pour la compression/décompression (tar+gzip sont dans busybox).
+RUN apk add --no-cache zip unzip
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev --no-audit --no-fund

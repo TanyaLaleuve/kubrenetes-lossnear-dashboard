@@ -65,12 +65,49 @@ export async function POST(
   const op = url.searchParams.get("op") ?? "";
   const path = url.searchParams.get("path") ?? "";
 
-  // delete → files.delete ; toute autre écriture → files.write
-  const permission = op === "delete" ? "files.delete" : "files.write";
+  // delete → files.delete ; téléchargement groupé → files.read ; sinon écriture.
+  const permission =
+    op === "delete" ? "files.delete" : op === "archive" ? "files.read" : "files.write";
   const { vol, error } = await resolve(id, permission);
   if (error) return error;
 
   switch (op) {
+    // Compression d'une sélection en une archive (tar.gz ou zip).
+    case "compress": {
+      const b = await request.json().catch(() => ({}));
+      const res = await agentFetch("/archive/compress", vol!, "", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths: b.paths ?? [], dest: b.dest ?? "", format: b.format ?? "targz" }),
+      });
+      return new NextResponse(await res.text(), { status: res.status });
+    }
+    // Extraction d'une archive (path) dans un dossier.
+    case "extract": {
+      const b = await request.json().catch(() => ({}));
+      const res = await agentFetch("/archive/extract", vol!, path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dest: b.dest ?? "" }),
+      });
+      return new NextResponse(await res.text(), { status: res.status });
+    }
+    // Téléchargement groupé : archive à la volée de la sélection.
+    case "archive": {
+      const b = await request.json().catch(() => ({}));
+      const res = await agentFetch("/archive/stream", vol!, "", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths: b.paths ?? [] }),
+      });
+      if (!res.ok) return new NextResponse(await res.text(), { status: res.status });
+      return new NextResponse(res.body, {
+        headers: {
+          "Content-Type": "application/gzip",
+          "Content-Disposition": `attachment; filename="selection.tar.gz"`,
+        },
+      });
+    }
     case "write":
     case "upload": {
       const body = await request.arrayBuffer();
